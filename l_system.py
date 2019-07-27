@@ -48,9 +48,9 @@ class L_system():
 		for i in range(len(self.rule[v])):
 			if np.random.rand()<p:
 				sub=random.sample(self.vocabulary, 1)[0]
-				if sub not in immune:
+				if len(immune.intersection({sub,self.rule[v][i]})) ==0:
 					print('point mutation')
-					var=self.rule[v][:i-1]+sub
+					var=self.rule[v][:i]+sub
 					if i+1<=len(self.rule[v])-1:
 						var+=self.rule[v][i+1:]
 					self.rule[v]=var
@@ -64,10 +64,34 @@ class L_system():
 		for i in range(len(self.rule[v])-1):
 			if np.random.rand()<p:
 				print('permutation mutation')
-				var=self.rule[v][:i-1]+self.rule[v][i+1]+self.rule[v][i]
-				if i+1<=len(self.rule[v])-1:
-					var+=self.rule[v][i+1:]
+				var=''
+				if i-1>=0:
+					var+=self.rule[v][:i]
+				var+=self.rule[v][i+1]+self.rule[v][i]
+				if i+2<=len(self.rule[v])-1:
+					var+=self.rule[v][i+2:]
+				print(self.rule[v])
+				print(var)
 				self.rule[v]=var
+
+	def add_mutation(self,v,p,words={},immune={}):
+		#words allows to extend the vocabulary by words from which can also be selected
+		if v not in self.vocabulary:
+			raise ValueError('The leter '+v+' is not in the vocabulary')
+		elif v not in self.rule:
+			print('note that there is no explicite rule for the letter '+v+'. We introduce it as the identity rule.')
+			self.add_rule(v,v)
+		extended_set=self.vocabulary.union(words)
+		new_w=self.rule[v]
+		j=0
+		for i in range(len(self.rule[v])-1):
+			if np.random.rand()<p:
+				add=random.sample(extended_set, 1)[0]
+				if add not in immune:
+					print('add mutation')
+					new_w=new_w[:i+j]+add+new_w[i+j:]
+					j+=1
+		self.rule[v]=new_w
 
 	def loss_mutation(self,v,p,immune={}):
 		if v not in self.vocabulary:
@@ -84,8 +108,6 @@ class L_system():
 				j+=1
 		self.rule[v]=new_w
 
-
-			
 
 	def add_rule(self, v, w,verbose=False):
 		#v: an element from the vocabulary (single string element)
@@ -129,6 +151,10 @@ class Tree_interpreter():
 		self.m_angle=minus_angle
 		self.randomize=randomize_angle
 		self.ex=np.array([1,0])
+
+	def angle_mutation(self):
+		self.p_angle*=np.random.rand()/2+0.75
+		self.m_angle*=np.random.rand()/2+0.75
 
 	def render(self,w):
 		#w must be a word over the standard alphabet

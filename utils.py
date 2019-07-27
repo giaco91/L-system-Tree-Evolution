@@ -132,7 +132,6 @@ def get_max_size(line_segments):
 	max_x=0
 	min_y=0
 	max_y=0
-	print('calculate tree dimensions ...')
 	for i in range(len(line_segments)):
 		if line_segments[i][0][0]<min_x:
 			min_x=line_segments[i][0][0]
@@ -155,8 +154,6 @@ def get_max_size(line_segments):
 	return max(max_x-min_x,max_y-min_y),x_mean
 
 
-
-
 def draw_tree(line_segments,im_size=500,width=1):
 	im=create_image(im_size,im_size)
 	max_size,x_mean=get_max_size(line_segments)
@@ -170,6 +167,35 @@ def draw_tree(line_segments,im_size=500,width=1):
 	for i in range(len(line_segments)):
 		draw.line([tuple(bias+scale*line_segments[i][0]),tuple(bias+scale*line_segments[i][1])],fill=(0,0,0),width=width)
 	return reflect_y_axis(im)
+
+def draw_trees(trees,im_size=1000,width=1):
+	#trees is a list of line_segments for each tree
+	im=create_image(im_size,im_size)
+	draw = ImageDraw.Draw(im)
+	n_trees=len(trees)
+	n_rows=int(np.ceil(np.sqrt(n_trees)))
+	W,H=im.size
+	W_n_rows=int(W/n_rows)
+	H_n_rows=int(H/n_rows)
+	W_n_2=int(W_n_rows/2)
+	H_n_2=int(H_n_rows/2)
+	i=0
+	print('draw tree...')
+	for wr in range(n_rows):
+		for hr in range(n_rows):
+			if i<=len(trees)-1:
+				max_size,x_mean=get_max_size(trees[i])
+				scale=0.9*W_n_rows/max_size
+				bias=np.array([W_n_2-scale*x_mean,0])
+				for j in range(len(trees[i])):
+					BIAS=np.array([wr*W_n_rows,hr*H_n_rows])
+					draw.line([tuple(BIAS+bias+scale*trees[i][j][0]),tuple(BIAS+bias+scale*trees[i][j][1])],fill=(0,50,0),width=width)
+			i+=1
+	return reflect_y_axis(im)
+
+
+
+
 
 
 
