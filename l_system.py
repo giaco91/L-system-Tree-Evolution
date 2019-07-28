@@ -49,7 +49,7 @@ class L_system():
 			if np.random.rand()<p:
 				sub=random.sample(self.vocabulary, 1)[0]
 				if len(immune.intersection({sub,self.rule[v][i]})) ==0:
-					print('point mutation')
+					#print('point mutation')
 					var=self.rule[v][:i]+sub
 					if i+1<=len(self.rule[v])-1:
 						var+=self.rule[v][i+1:]
@@ -63,15 +63,13 @@ class L_system():
 			self.add_rule(v,v)
 		for i in range(len(self.rule[v])-1):
 			if np.random.rand()<p:
-				print('permutation mutation')
+				#print('permutation mutation')
 				var=''
 				if i-1>=0:
 					var+=self.rule[v][:i]
 				var+=self.rule[v][i+1]+self.rule[v][i]
 				if i+2<=len(self.rule[v])-1:
 					var+=self.rule[v][i+2:]
-				print(self.rule[v])
-				print(var)
 				self.rule[v]=var
 
 	def add_mutation(self,v,p,words={},immune={}):
@@ -88,7 +86,7 @@ class L_system():
 			if np.random.rand()<p:
 				add=random.sample(extended_set, 1)[0]
 				if add not in immune:
-					print('add mutation')
+					#print('add mutation')
 					new_w=new_w[:i+j]+add+new_w[i+j:]
 					j+=1
 		self.rule[v]=new_w
@@ -103,7 +101,7 @@ class L_system():
 		j=0
 		for i in range(len(self.rule[v])-1):
 			if np.random.rand()<p and self.rule[v][i] not in immune:
-				print('loss mutation')
+				#print('loss mutation')
 				new_w=new_w[:i-j]+new_w[i+1-j:]
 				j+=1
 		self.rule[v]=new_w
@@ -138,7 +136,7 @@ class L_system():
 	def evolution(self,w,n_iter):
 		#w is a word (also called axiom in this context) over the vocabulary set (if it has symbols outside of the vocabulary set, the identity map is assumed)
 		#n_iter, the amount of iterations
-		print('calculate DNA...')
+		#print('calculate DNA...')
 		for n in range(n_iter):
 			w=self.iter_step(w)
 		return w
@@ -160,7 +158,7 @@ class Tree_interpreter():
 		#w must be a word over the standard alphabet
 		#returns a list of line segment objects represented by the start coordinates (x_s,y_s) and end coordinates (x_e,y_e)
 		#the starting point is (0,0) and starting direction is (0,1)
-		print('calculate line segments ...')
+		#print('calculate line segments ...')
 		starting_root=np.array([0,0])
 		starting_angle=np.pi/2
 		line_segments,_=self.rendering_recursion(starting_root,starting_angle,w)

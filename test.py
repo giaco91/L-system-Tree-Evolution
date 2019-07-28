@@ -17,7 +17,7 @@ l_system.add_rule('X', 'F+[[X]-X]-F[-FX]+X',verbose=True)
 l_system.add_rule('F', 'FF',verbose=True)
 # print(l_system.vocabulary)
 # print(l_system.rule)
-# l_system.add_mutation('X',1,immune={'[',']'})
+# l_system.add_mutation('X',1,words={'[]'},immune={'[',']'})
 # print(l_system.rule)
 tree_interpreter=Tree_interpreter(plus_angle=np.pi/8,minus_angle=-np.pi/6,randomize_angle=False)
 

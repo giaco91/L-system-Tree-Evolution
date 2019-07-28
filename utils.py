@@ -18,8 +18,8 @@ import matplotlib.pyplot as plt
 
 
 
-def create_image(i, j):
-	image = Image.new("RGB", (i, j), "white")
+def create_image(i, j,color=(255,255,255)):
+	image = Image.new("RGB", (i, j), color=color)
 	return image
 
 def unit_vector(vector):
@@ -141,31 +141,35 @@ def get_max_size(line_segments):
 			min_y=line_segments[i][0][1]
 		if line_segments[i][0][1]>max_y:
 			max_y=line_segments[i][0][1]
-	if line_segments[-1][1][0]<min_x:
-		min_x=line_segments[i][1][0]
-	if line_segments[-1][1][0]>max_x:
-		max_x=line_segments[i][1][0]
-	if line_segments[-1][1][1]<min_y:
-		min_y=line_segments[i][1][1]
-	if line_segments[-1][1][1]>max_y:
-		max_y=line_segments[i][1][1]
+	if len(line_segments)>0:
+		if line_segments[-1][1][0]<min_x:
+			min_x=line_segments[i][1][0]
+		if line_segments[-1][1][0]>max_x:
+			max_x=line_segments[i][1][0]
+		if line_segments[-1][1][1]<min_y:
+			min_y=line_segments[i][1][1]
+		if line_segments[-1][1][1]>max_y:
+			max_y=line_segments[i][1][1]
 
 	x_mean=(max_x+min_x)/2
-	return max(max_x-min_x,max_y-min_y),x_mean
+	return max(max_x-min_x,max_y-min_y),x_mean,min_y
 
 
 def draw_tree(line_segments,im_size=500,width=1):
 	im=create_image(im_size,im_size)
-	max_size,x_mean=get_max_size(line_segments)
-	scale=0.9*im_size/max_size
-	W,H=im.size
-	W_2=int(W/2)
-	H_2=int(H/2)
-	bias=np.array([W_2-scale*x_mean,0])
-	draw = ImageDraw.Draw(im)
-	print('draw tree...')
-	for i in range(len(line_segments)):
-		draw.line([tuple(bias+scale*line_segments[i][0]),tuple(bias+scale*line_segments[i][1])],fill=(0,0,0),width=width)
+	if len(line_segments)>0:
+		max_size,x_mean,y_min=get_max_size(line_segments)
+		if max_size==0:
+			print(line_segments)
+		scale=0.9*im_size/max_size
+		W,H=im.size
+		W_2=int(W/2)
+		H_2=int(H/2)
+		bias=np.array([W_2-scale*x_mean,-scale*y_min])
+		draw = ImageDraw.Draw(im)
+		#print('draw tree...')
+		for i in range(len(line_segments)):
+			draw.line([tuple(bias+scale*line_segments[i][0]),tuple(bias+scale*line_segments[i][1])],fill=(30,80,0),width=width)
 	return reflect_y_axis(im)
 
 def draw_trees(trees,im_size=1000,width=1):
@@ -180,7 +184,7 @@ def draw_trees(trees,im_size=1000,width=1):
 	W_n_2=int(W_n_rows/2)
 	H_n_2=int(H_n_rows/2)
 	i=0
-	print('draw tree...')
+	#print('draw tree...')
 	for wr in range(n_rows):
 		for hr in range(n_rows):
 			if i<=len(trees)-1:
