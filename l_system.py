@@ -72,7 +72,7 @@ class L_system():
 					var+=self.rule[v][i+2:]
 				self.rule[v]=var
 
-	def add_mutation(self,v,p,words={},immune={}):
+	def add_mutation(self,v,p,words={},immune={},max_character=12):
 		#words allows to extend the vocabulary by words from which can also be selected
 		if v not in self.vocabulary:
 			raise ValueError('The leter '+v+' is not in the vocabulary')
@@ -89,9 +89,10 @@ class L_system():
 					#print('add mutation')
 					new_w=new_w[:i+j]+add+new_w[i+j:]
 					j+=1
-		self.rule[v]=new_w
+		if len(new_w)<=max_character:
+			self.rule[v]=new_w
 
-	def loss_mutation(self,v,p,immune={}):
+	def loss_mutation(self,v,p,immune={},min_character=2):
 		if v not in self.vocabulary:
 			raise ValueError('The leter '+v+' is not in the vocabulary')
 		elif v not in self.rule:
@@ -104,7 +105,8 @@ class L_system():
 				#print('loss mutation')
 				new_w=new_w[:i-j]+new_w[i+1-j:]
 				j+=1
-		self.rule[v]=new_w
+		if len(new_w)>=min_character:
+			self.rule[v]=new_w
 
 
 	def add_rule(self, v, w,verbose=False):
@@ -115,31 +117,51 @@ class L_system():
 			for i in range(len(w)):
 				if w[i] not in self.vocabulary:
 					raise ValueError('The rule is not allowed since it maps outside of the specified vocabulary. Update the vocabulary if needed.')
-		if len(v)>=2:
-			raise ValueError('the input of the rule must be a single element from the vocabulary, but given word of length '+str(len(v)))
-		else:
-			if verbose:
-				if v in self.rule:
-					print('rule for '+v+' replaced')
-			self.rule[v]=w
+		if verbose:
+			if v in self.rule:
+				print('rule for '+v+' replaced')
+		self.rule[v]=w
 
-	def iter_step(self,w):
+	def iter_step(self,w,depth_list,depth,depth_specific=False):
 		#w is a word over the vocabulary set (if it has symbols outside of the vocabulary set, the identity map is assumed)
 		next_w=''
+		next_depth_list=[]
 		for i in range(len(w)):
-			if w[i] in self.rule:
-				next_w+=self.rule[w[i]]
+			current_w=w[i]
+			if depth_specific:
+				current_w+=str(depth)
+			if current_w in self.rule:
+				sub=self.rule[current_w]
+				next_w+=sub
+				for j in range(len(sub)):
+					next_depth_list.append(depth)
+			elif depth_specific and w[i] in self.rule:
+					next_w+=self.rule[w[i]]
+					#print('used for default value for rule: '+str(w[i]))
 			else:
 				next_w+=w[i]
-		return next_w
+				next_depth_list.append(depth_list[i])
+		return next_w,next_depth_list
 
-	def evolution(self,w,n_iter):
+	def general_mutation(self,v,p=0.01,immune={},words={}):
+		self.loss_mutation(v,p,immune=immune)
+		self.point_mutation(v,p,immune=immune)
+		self.perm_mutation(v,p)
+		self.add_mutation(v,p,immune=immune,words=words)
+
+	def evolution(self,w,n_iter,depth_specific=False):
 		#w is a word (also called axiom in this context) over the vocabulary set (if it has symbols outside of the vocabulary set, the identity map is assumed)
 		#n_iter, the amount of iterations
 		#print('calculate DNA...')
+		depth_list=[]
+		for i in range(len(w)):
+			depth_list.append(0)#the root has same depth than the first iteration
 		for n in range(n_iter):
-			w=self.iter_step(w)
-		return w
+			if depth_specific:
+				w,depth_list=self.iter_step(w,depth_list,depth=n,depth_specific=True)
+			else:
+				w,depth_list=self.iter_step(w,depth_list,depth=n)
+		return w,depth_list
 
 class Tree_interpreter():
 	#this interpreter turns a string with the standard vocabulary {'X','F','-','+','[',']'} into a set of line segments by the 
@@ -196,9 +218,111 @@ class Tree_interpreter():
 
 
 
+class Depth_specific_tree_interpreter():
+	#this interpreter turns a string with the standard vocabulary {'X','F','-','+','[',']'} into a set of line segments by the 
+	#rule of turtle walk. However, in this depth specific case the length of the move "F" and the angles "+/-" can depend on the iteration depth
+	def __init__(self,depth=2,plus_angles=[np.pi/8,np.pi/8],minus_angles=[-np.pi/8,np.pi/8],lengths=[1,1],cross_sections=[0.1,0.1]):
+		if depth!=len(plus_angles) or depth!=len(minus_angles) or depth!=len(lengths) or depth!=len(cross_sections):
+			raise ValueError('the depth must be in accordance with the number of the depth parameters.')
+		self.depth=depth
+		self.p_angles=plus_angles
+		self.m_angles=minus_angles
+		self.lengths=lengths
+		self.cs=cross_sections
+		self.ex=np.array([1,0])
+
+	def angle_and_size_mutation(self):
+		for i in range(self.depth):
+			self.p_angles[i]*=np.random.rand()/2+0.75
+			self.m_angles[i]*=np.random.rand()/2+0.75
+			self.lengths[i]*=np.random.rand()/2+0.75
+			self.cs[i]*=np.random.rand()/2+0.75
+
+	def depth_mutation(self,p=0.05,max_depth=8,min_depth=2):
+		p/=2
+		r=np.random.rand()
+		if r<p:
+			if self.depth<=max_depth-1:
+				#print('depth increased')
+				self.depth+=1
+				self.p_angles.append(self.p_angles[-1])
+				self.m_angles.append(self.m_angles[-1])
+				self.lengths.append(self.lengths[-1])
+				self.cs.append(self.cs[-1])
+		elif r>(1-p):
+			if self.depth>=min_depth+1:
+				#print('depth decreased')
+				self.depth-=1
+				del self.p_angles[-1]
+				del self.m_angles[-1]
+				del self.lengths[-1]
+				del self.cs[-1]
 
 
+	def render(self,w,depth_list):
+		#w must be a word over the standard alphabet
+		#returns a list of branch objects 
+		#the starting point is (0,0) and starting direction is (0,1)
+		#print('calculate branch objects ...')
+		starting_root=np.array([0,0])
+		starting_angle=np.pi/2
+		branches,_,_=self.rendering_recursion(starting_root,starting_angle,w,depth_list)
+		return branches
 
+	def rendering_recursion(self,root,root_angle,w,depth_list):
+		current_angle=root_angle
+		current_root=root
+		branches=[]
+		side_branches=[]
+		i=0
+		cumulative_moment=[]#the accumulated moments with respect to the origin in the form of nested lists [[l1*m1,m1],[l2*m2,m2],...,]
+		length_w=len(w)
+		while i<=length_w-1:
+			if w[i]=='[':
+				additional_branches, n,cm=self.rendering_recursion(current_root,current_angle,w[i+1:],depth_list[i+1:])
+				i+=n
+				L,M=get_reduced_moment(cm)
+				for j in range(len(branches)):
+					branches[j].add_moment(M*(L-branches[j].sc[0]))
+				#cumulative_moment+=cm
+				# branches+=additional_branches
+				side_branches+=additional_branches
+			elif w[i]==']':
+				return branches+side_branches,i+1,cumulative_moment
+			elif w[i]=='F':
+				next_root=current_root+self.lengths[depth_list[i]]*rotation(current_angle,self.ex)
+				branch=Branch(self.cs[depth_list[i]],current_root,next_root)
+				for j in range(len(branches)):
+					branches[j].add_moment(branch.mass*(branch.center_of_mass_coordinates[0]-branches[j].sc[0]))
+				cumulative_moment.append([branch.center_of_mass_coordinates[0]*branch.mass,branch.mass])
+				branches.append(branch)
+				current_root=next_root
+			elif w[i]=='+':
+				current_angle+=self.p_angles[depth_list[i]]
+			elif w[i]=='-':
+				current_angle+=self.m_angles[depth_list[i]]
+			i+=1
+		return branches+side_branches,length_w,cumulative_moment
+
+class Branch():
+	#this interpreter turns a string with the standard vocabulary {'X','F','-','+','[',']'} into a set of line segments by the 
+	#rule of turtle walk. However, in this depth specific case the length of the move "F" and the angles "+/-" can depend on the iteration depth
+	def __init__(self,cross_section,start_coordinates,end_coordinates):
+		#start and end coordinates are numpy arrays
+		self.sc=start_coordinates
+		self.ec=end_coordinates
+		self.center_of_mass_coordinates=(self.sc+self.ec)/2
+		self.l=np.linalg.norm(end_coordinates-start_coordinates)
+		self.cs=cross_section
+		self.mass=self.l*self.cs**2
+		self.max_moment=self.cs**2#normalized by e-module and geometric constant
+		self.moment=self.mass*(self.center_of_mass_coordinates[0]-self.sc[0])#the moment acting at the start position of the branche normalized by gravity constant
+
+	def add_moment(self,delta_moment):
+		self.moment+=delta_moment
+
+	def stress(self):
+		return self.moment/self.max_moment
 
 
 

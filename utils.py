@@ -160,7 +160,8 @@ def draw_tree(line_segments,im_size=500,width=1):
 	if len(line_segments)>0:
 		max_size,x_mean,y_min=get_max_size(line_segments)
 		if max_size==0:
-			print(line_segments)
+			print('something went wrong, because max_size is zero')
+			max_size=1
 		scale=0.9*im_size/max_size
 		W,H=im.size
 		W_2=int(W/2)
@@ -188,26 +189,189 @@ def draw_trees(trees,im_size=1000,width=1):
 	for wr in range(n_rows):
 		for hr in range(n_rows):
 			if i<=len(trees)-1:
-				max_size,x_mean=get_max_size(trees[i])
-				scale=0.9*W_n_rows/max_size
-				bias=np.array([W_n_2-scale*x_mean,0])
-				for j in range(len(trees[i])):
-					BIAS=np.array([wr*W_n_rows,hr*H_n_rows])
-					draw.line([tuple(BIAS+bias+scale*trees[i][j][0]),tuple(BIAS+bias+scale*trees[i][j][1])],fill=(0,50,0),width=width)
+				if len(trees[i])>0:
+					max_size,x_mean,y_min=get_max_size(trees[i])
+					scale=0.9*W_n_rows/max_size
+					bias=np.array([W_n_2-scale*x_mean,-scale*y_min])
+					for j in range(len(trees[i])):
+						BIAS=np.array([wr*W_n_rows,hr*H_n_rows])
+						draw.line([tuple(BIAS+bias+scale*trees[i][j][0]),tuple(BIAS+bias+scale*trees[i][j][1])],fill=(0,50,0),width=width)
 			i+=1
 	return reflect_y_axis(im)
 
 
 
+def draw_branches(branches,im_size=1000):
+	max_stress=get_max_stress(branches)
+	im=create_image(im_size,im_size)
+	if len(branches)>0:
+		dx,dy,x_mean,y_min=from_branches_get_max_size(branches)
+		max_size=max(dx,dy)
+		if max_size==0:
+			print('something went wrong, because max_size is zero')
+			max_size=1
+		scale=0.9*im_size/max_size
+		W,H=im.size
+		W_2=int(W/2)
+		H_2=int(H/2)
+		bias=np.array([W_2-scale*x_mean,-scale*y_min])
+		draw = ImageDraw.Draw(im)
+		#print('draw tree...')
+		for i in range(len(branches)):
+			if branches[i].stress()>0:
+				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(int(255*branches[i].stress()/max_stress),0,0),width=max(1,int(round(scale*branches[i].cs))))
+			else:
+				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,int(-255*branches[i].stress()/max_stress)),width=max(1,int(round(scale*branches[i].cs))))
+	return reflect_y_axis(im)
 
 
 
+def draw_trees_from_branches(trees,im_size=1000):
+	#trees is a list of branches for each tree
+	im=create_image(im_size,im_size)
+	draw = ImageDraw.Draw(im)
+	n_trees=len(trees)
+	n_rows=int(np.ceil(np.sqrt(n_trees)))
+	W,H=im.size
+	W_n_rows=int(W/n_rows)
+	H_n_rows=int(H/n_rows)
+	W_n_2=int(W_n_rows/2)
+	H_n_2=int(H_n_rows/2)
+	MAX_SIZE=0
+	for k in range(n_trees):
+		dx,dy,_,_=from_branches_get_max_size(trees[k])
+		max_size=max(dx,dy)
+		if max_size>MAX_SIZE:
+			MAX_SIZE=max_size
+	i=0
+	for wr in range(n_rows):
+		for hr in range(n_rows):
+			if i<=len(trees)-1:
+				if len(trees[i])>0:
+					dx,dy,x_mean,y_min=from_branches_get_max_size(trees[i])
+					max_size=max(dx,dy)
+					if max_size==0:
+						print('something went wrong, because max_size is zero')
+						max_size=1
+					scale=0.9*W_n_rows/MAX_SIZE
+					bias=np.array([W_n_2-scale*x_mean,-scale*y_min])
+					for j in range(len(trees[i])):
+						BIAS=np.array([wr*W_n_rows,hr*H_n_rows])
+						draw.line([tuple(BIAS+bias+scale*trees[i][j].sc),tuple(BIAS+bias+scale*trees[i][j].ec)],fill=(0,0,0),width=max(1,int(round(scale*trees[i][j].cs))))
+			i+=1
+	return reflect_y_axis(im)
 
 
+def from_branches_get_max_size(branches):
+	min_x=0
+	max_x=0
+	min_y=0
+	max_y=0
+	for i in range(len(branches)):
+		if branches[i].sc[0]<min_x:
+			min_x=branches[i].sc[0]
+		if branches[i].sc[0]>max_x:
+			max_x=branches[i].sc[0]
+		if branches[i].sc[1]<min_y:
+			min_y=branches[i].sc[1]
+		if branches[i].sc[1]>max_y:
+			max_y=branches[i].sc[1]
+	if len(branches)>0:
+		if branches[-1].ec[0]<min_x:
+			min_x=branches[-1].ec[0]
+		if branches[-1].ec[0]>max_x:
+			max_x=branches[-1].ec[0]
+		if branches[-1].ec[1]<min_y:
+			min_y=branches[-1].ec[1]
+		if branches[-1].ec[1]>max_y:
+			max_y=branches[-1].ec[1]
+
+	x_mean=(max_x+min_x)/2
+	return max_x-min_x,max_y-min_y,x_mean,min_y
+
+def get_max_stress(branches):
+	if len(branches)>0:
+		max_stress=-1e10
+		for b in branches:
+			if abs(b.stress())>max_stress:
+				max_stress=abs(b.stress())
+		return max_stress
+	else:
+		return 0
+
+def get_average_stress(branches):
+	if len(branches)>0:
+		stress=0
+		for b in branches:
+			stress+=abs(b.stress())
+		return stress/len(branches)
+	else:
+		return 0
+
+def get_total_mass(branches):
+	if len(branches)>0:
+		mass=0
+		for b in branches:
+			mass+=b.mass
+		return mass
+	else:
+		return 0
 
 
+def get_score(branches,verbose=False):
+	#calculates the score for a given tree described by the given list of branches
+	dx,dy,x_mean,y_min=from_branches_get_max_size(branches)
+	average_stress=get_average_stress(branches)
+	max_stress=get_max_stress(branches)
+	mass=get_total_mass(branches)
+	a=-10*np.exp(-0.1*dx*dy)#maximize area of tree up to saturation
+	b=-0.1*(dy-3)**2#tree hight is optimal at 3
+	c=-abs(x_mean)**2#symmetry
+	d=min(y_min,0)**3#no branches with negative y-coordinates
+	e=-average_stress
+	f=-max_stress
+	g=-0.1*mass
+	h=0.15*len(branches)**0.5
 
+	score=a+b+c+d+e+f+g+h
+	if verbose:
+		print(a)
+		print(b)
+		print(c)
+		print(d)
+		print(e)
+		print(f)
+		print(g)
+		print(h)
+	return score
 
+def get_reduced_moment(cumulative_moment):
+	#cumulative_momentthe accumulated moments with respect to the origin in the form of nested lists [[l1*m1,m1],[l2*m2,m2],...,]
+	#we want to calculate the equivalent reduced form L*M=l1*m1+l2*m2+...
+	M=0
+	lm=0
+	L=0
+	for i in range(len(cumulative_moment)):
+		lm+=cumulative_moment[i][0]
+		M+=cumulative_moment[i][1]
+	if len(cumulative_moment)>0:
+		L=lm/M
+	return L,M
+
+def make_gif(pil_images,save_path='tree_evolution.gif',duration=500):
+	# frames=[]
+	# for im in pil_images:
+	# 	frames.append(pil_f)
+	# frames[0].save(path,
+	#                save_all=True,
+	#                append_images=frames[1:],
+	#                duration=100,
+	#                loop=0)
+	pil_images[0].save(save_path,
+	              save_all=True,
+	              append_images=pil_images[1:],
+	              duration=duration,
+	              loop=0)
 
 
 
