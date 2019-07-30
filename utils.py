@@ -6,7 +6,7 @@ import sys
 from copy import deepcopy
 import math
 import numpy as np
-from PIL import Image,ExifTags,ImageFilter,ImageOps, ImageDraw
+from PIL import Image,ExifTags,ImageFilter,ImageOps, ImageDraw, ImageFont
 import PIL
 import numpy as np
 import pickle
@@ -201,9 +201,11 @@ def draw_trees(trees,im_size=1000,width=1):
 
 
 
-def draw_branches(branches,im_size=1000):
+def draw_branches(branches,im_size=1000,text=None):
+	#text must be alist of strings
 	max_stress=get_max_stress(branches)
 	im=create_image(im_size,im_size)
+	draw = ImageDraw.Draw(im)
 	if len(branches)>0:
 		dx,dy,x_mean,y_min=from_branches_get_max_size(branches)
 		max_size=max(dx,dy)
@@ -215,14 +217,22 @@ def draw_branches(branches,im_size=1000):
 		W_2=int(W/2)
 		H_2=int(H/2)
 		bias=np.array([W_2-scale*x_mean,-scale*y_min])
-		draw = ImageDraw.Draw(im)
 		#print('draw tree...')
 		for i in range(len(branches)):
 			if branches[i].stress()>0:
 				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(int(255*branches[i].stress()/max_stress),0,0),width=max(1,int(round(scale*branches[i].cs))))
 			else:
 				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,int(-255*branches[i].stress()/max_stress)),width=max(1,int(round(scale*branches[i].cs))))
-	return reflect_y_axis(im)
+	im_reflected= reflect_y_axis(im)
+	draw = ImageDraw.Draw(im_reflected)
+	if text is not None:
+		dy=0
+		for i in range(len(text)):
+			font = ImageFont.truetype("arial.ttf", int(40*im_size/1000))
+			draw.text((int(0.01*im_size),int(0.01*im_size+dy)), text[i], font=font, fill=(0,0,0))
+			dy+=font.getsize(text[i])[1]
+
+	return im_reflected
 
 
 
@@ -359,14 +369,7 @@ def get_reduced_moment(cumulative_moment):
 	return L,M
 
 def make_gif(pil_images,save_path='tree_evolution.gif',duration=500):
-	# frames=[]
-	# for im in pil_images:
-	# 	frames.append(pil_f)
-	# frames[0].save(path,
-	#                save_all=True,
-	#                append_images=frames[1:],
-	#                duration=100,
-	#                loop=0)
+	print('create gif ...')
 	pil_images[0].save(save_path,
 	              save_all=True,
 	              append_images=pil_images[1:],
