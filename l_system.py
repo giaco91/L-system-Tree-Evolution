@@ -143,11 +143,11 @@ class L_system():
 				next_depth_list.append(depth_list[i])
 		return next_w,next_depth_list
 
-	def general_mutation(self,v,p=0.01,immune={},words={}):
+	def general_mutation(self,v,p=0.01,immune={},words={},max_character=15):
 		self.loss_mutation(v,p,immune=immune)
-		self.point_mutation(v,p,immune=immune)
+		self.point_mutation(v,min(1,2*p),immune=immune)
 		self.perm_mutation(v,p)
-		self.add_mutation(v,p,immune=immune,words=words)
+		self.add_mutation(v,p,immune=immune,words=words,max_character=max_character)
 
 	def evolution(self,w,n_iter,depth_specific=False):
 		#w is a word (also called axiom in this context) over the vocabulary set (if it has symbols outside of the vocabulary set, the identity map is assumed)
@@ -221,7 +221,7 @@ class Tree_interpreter():
 class Depth_specific_tree_interpreter():
 	#this interpreter turns a string with the standard vocabulary {'X','F','-','+','[',']'} into a set of line segments by the 
 	#rule of turtle walk. However, in this depth specific case the length of the move "F" and the angles "+/-" can depend on the iteration depth
-	def __init__(self,depth=2,plus_angles=[np.pi/8,np.pi/8],minus_angles=[-np.pi/8,np.pi/8],lengths=[1,1],cross_sections=[0.1,0.1]):
+	def __init__(self,depth=2,plus_angles=[np.pi/8,np.pi/8],minus_angles=[-np.pi/8,np.pi/8],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=0.01):
 		if depth!=len(plus_angles) or depth!=len(minus_angles) or depth!=len(lengths) or depth!=len(cross_sections):
 			raise ValueError('the depth must be in accordance with the number of the depth parameters.')
 		self.depth=depth
@@ -230,42 +230,64 @@ class Depth_specific_tree_interpreter():
 		self.lengths=lengths
 		self.cs=cross_sections
 		self.ex=np.array([1,0])
+		self.leaf_radius=leaf_radius
+		self.leaf_mass=leaf_density*leaf_radius**2
+
 
 	def angle_and_size_mutation(self):
+		#self.leaf_radius*=np.random.rand()/2+0.75
 		for i in range(self.depth):
-			self.p_angles[i]*=np.random.rand()/2+0.75
-			self.m_angles[i]*=np.random.rand()/2+0.75
+			self.p_angles[i]=min(np.pi,self.p_angles[i]*(np.random.rand()/2+0.75))
+			self.m_angles[i]=max(-np.pi,self.m_angles[i]*(np.random.rand()/2+0.75))
 			self.lengths[i]*=np.random.rand()/2+0.75
-			self.cs[i]*=np.random.rand()/2+0.75
+			self.cs[i]=max(0.02,self.cs[i]*(np.random.rand()/2+0.75))
 
 	def depth_mutation(self,p=0.05,max_depth=8,min_depth=2):
 		p/=2
 		r=np.random.rand()
 		if r<p:
 			if self.depth<=max_depth-1:
-				#print('depth increased')
-				self.depth+=1
+			# 	#print('depth increased')
+			# 	self.depth+=1
+			# 	self.p_angles.append(self.p_angles[-1])
+			# 	self.m_angles.append(self.m_angles[-1])
+			# 	self.lengths.append(self.lengths[-1])
+			# 	self.cs.append(self.cs[-1])
+				self.modify_depth(self.depth+1)
+		elif r>(1-p):
+			if self.depth>=min_depth+1:
+				#print('depth decreased')
+				# self.depth-=1
+				# del self.p_angles[-1]
+				# del self.m_angles[-1]
+				# del self.lengths[-1]
+				# del self.cs[-1]
+				self.modify_depth(self.depth-1)
+
+	def modify_depth(self,new_depth):
+		if new_depth<1:
+			raise ValueError('depth can not be smaller than one!')
+		delta=new_depth-self.depth
+		self.depth=new_depth
+		if delta>0:
+			for i in range(delta):
 				self.p_angles.append(self.p_angles[-1])
 				self.m_angles.append(self.m_angles[-1])
 				self.lengths.append(self.lengths[-1])
 				self.cs.append(self.cs[-1])
-		elif r>(1-p):
-			if self.depth>=min_depth+1:
-				#print('depth decreased')
-				self.depth-=1
+		else:
+			for i in range(delta):
 				del self.p_angles[-1]
 				del self.m_angles[-1]
 				del self.lengths[-1]
 				del self.cs[-1]
 
 
-	def render(self,w,depth_list):
+	def render(self,w,depth_list,starting_root=np.array([0,0]),starting_angle=np.pi/2):
 		#w must be a word over the standard alphabet
 		#returns a list of branch objects 
 		#the starting point is (0,0) and starting direction is (0,1)
 		#print('calculate branch objects ...')
-		starting_root=np.array([0,0])
-		starting_angle=np.pi/2
 		branches,_,_=self.rendering_recursion(starting_root,starting_angle,w,depth_list)
 		return branches
 
@@ -277,6 +299,7 @@ class Depth_specific_tree_interpreter():
 		i=0
 		cumulative_moment=[]#the accumulated moments with respect to the origin in the form of nested lists [[l1*m1,m1],[l2*m2,m2],...,]
 		length_w=len(w)
+		last_rec=False
 		while i<=length_w-1:
 			if w[i]=='[':
 				additional_branches, n,cm=self.rendering_recursion(current_root,current_angle,w[i+1:],depth_list[i+1:])
@@ -284,12 +307,19 @@ class Depth_specific_tree_interpreter():
 				L,M=get_reduced_moment(cm)
 				for j in range(len(branches)):
 					branches[j].add_moment(M*(L-branches[j].sc[0]))
-				#cumulative_moment+=cm
-				# branches+=additional_branches
-				side_branches+=additional_branches
+				if len(additional_branches)>0:
+					last_rec=True
+					side_branches+=additional_branches
 			elif w[i]==']':
+				# if len(branches)>0 and len(side_branches)==0:
+				if len(branches)>0 and not last_rec:
+					branches[-1].add_leaf(self.leaf_radius,self.leaf_mass)
+					for j in range(len(branches)):
+						branches[-1-j].add_moment(branches[-1].leaf_mass*(branches[-1].ec[0]-branches[-1-j].sc[0]))
+					#branches[-1].leaf_radius=self.leaf_radius
 				return branches+side_branches,i+1,cumulative_moment
 			elif w[i]=='F':
+				last_rec=False
 				next_root=current_root+self.lengths[depth_list[i]]*rotation(current_angle,self.ex)
 				branch=Branch(self.cs[depth_list[i]],current_root,next_root)
 				for j in range(len(branches)):
@@ -302,12 +332,17 @@ class Depth_specific_tree_interpreter():
 			elif w[i]=='-':
 				current_angle+=self.m_angles[depth_list[i]]
 			i+=1
+		if len(branches)>0 and not last_rec:
+			branches[-1].add_leaf(self.leaf_radius,self.leaf_mass)
+			for j in range(len(branches)):
+				branches[-1-j].add_moment(branches[-1].leaf_mass*(branches[-1].ec[0]-branches[-1-j].sc[0]))
+			#branches[-1].leaf_radius=self.leaf_radius
 		return branches+side_branches,length_w,cumulative_moment
 
 class Branch():
 	#this interpreter turns a string with the standard vocabulary {'X','F','-','+','[',']'} into a set of line segments by the 
 	#rule of turtle walk. However, in this depth specific case the length of the move "F" and the angles "+/-" can depend on the iteration depth
-	def __init__(self,cross_section,start_coordinates,end_coordinates):
+	def __init__(self,cross_section,start_coordinates,end_coordinates,leaf_radius=None,leaf_mass=None):
 		#start and end coordinates are numpy arrays
 		self.sc=start_coordinates
 		self.ec=end_coordinates
@@ -317,6 +352,8 @@ class Branch():
 		self.mass=self.l*self.cs**2
 		self.max_moment=self.cs**2#normalized by e-module and geometric constant
 		self.moment=self.mass*(self.center_of_mass_coordinates[0]-self.sc[0])#the moment acting at the start position of the branche normalized by gravity constant
+		self.leaf_radius=leaf_radius
+		self.leaf_mass=leaf_mass
 
 	def add_moment(self,delta_moment):
 		self.moment+=delta_moment
@@ -324,7 +361,23 @@ class Branch():
 	def stress(self):
 		return self.moment/self.max_moment
 
+	def update_position(self,sc,ec):
+		self.sc=sc
+		self.ec=ec
+		self.center_of_mass_coordinates=(self.sc+self.ec)/2
+		self.l=np.linalg.norm(end_coordinates-start_coordinates)
+		self.mass=self.l*self.cs**2
+		self.moment=self.mass*(self.center_of_mass_coordinates[0]-self.sc[0])#any additional moment is lost
 
+	def update_cross_section(self,cs):
+		self.cs=cs
+		self.mass=self.l*self.cs**2
+		self.max_moment=self.cs**2
+		self.moment=self.mass*(self.center_of_mass_coordinates[0]-self.sc[0])#any additional moment is lost
+
+	def add_leaf(self,leaf_radius,leaf_mass):
+		self.leaf_radius=leaf_radius
+		self.leaf_mass=leaf_mass
 
 
 

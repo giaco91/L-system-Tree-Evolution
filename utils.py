@@ -201,28 +201,35 @@ def draw_trees(trees,im_size=1000,width=1):
 
 
 
-def draw_branches(branches,im_size=1000,text=None):
+def draw_branches(branches,im_size=1000,text=None,draw_leafs=True,draw_stress=True):
 	#text must be alist of strings
 	max_stress=get_max_stress(branches)
-	im=create_image(im_size,im_size)
+	im=create_image(int(1.1*im_size),im_size)
 	draw = ImageDraw.Draw(im)
 	if len(branches)>0:
-		dx,dy,x_mean,y_min=from_branches_get_max_size(branches)
+		dx,dy,x_mean,y_min,_=from_branches_get_max_size(branches)
 		max_size=max(dx,dy)
 		if max_size==0:
 			print('something went wrong, because max_size is zero')
 			max_size=1
-		scale=0.9*im_size/max_size
-		W,H=im.size
-		W_2=int(W/2)
-		H_2=int(H/2)
-		bias=np.array([W_2-scale*x_mean,-scale*y_min])
+		scale=0.7*im_size/max_size
+		#W,H=im.size
+		W_2=int(im_size/2)
+		H_2=W_2
+		bias=np.array([0.1*im_size+W_2-scale*x_mean,0.05*im_size-scale*y_min])
 		#print('draw tree...')
 		for i in range(len(branches)):
-			if branches[i].stress()>0:
-				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(int(255*branches[i].stress()/max_stress),0,0),width=max(1,int(round(scale*branches[i].cs))))
+			if draw_stress:
+				if branches[i].stress()>0:
+					draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(int(255*branches[i].stress()/max_stress),0,0),width=max(1,int(round(scale*branches[i].cs))))
+				else:
+					draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,int(-255*branches[i].stress()/max_stress)),width=max(1,int(round(scale*branches[i].cs))))
 			else:
-				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,int(-255*branches[i].stress()/max_stress)),width=max(1,int(round(scale*branches[i].cs))))
+				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,0),width=max(1,int(round(scale*branches[i].cs))))
+			if draw_leafs:
+				if branches[i].leaf_radius is not None:
+					box_coord=tuple(bias+scale*(branches[i].ec-branches[i].leaf_radius))+tuple(bias+scale*(branches[i].ec+branches[i].leaf_radius))
+					draw.ellipse(box_coord, fill=(100,255,100), outline=(0,255,0))
 	im_reflected= reflect_y_axis(im)
 	draw = ImageDraw.Draw(im_reflected)
 	if text is not None:
@@ -230,7 +237,7 @@ def draw_branches(branches,im_size=1000,text=None):
 		for i in range(len(text)):
 			font = ImageFont.truetype("arial.ttf", int(40*im_size/1000))
 			draw.text((int(0.01*im_size),int(0.01*im_size+dy)), text[i], font=font, fill=(0,0,0))
-			dy+=font.getsize(text[i])[1]
+			dy+=1.1*font.getsize(text[i])[1]
 
 	return im_reflected
 
@@ -249,7 +256,7 @@ def draw_trees_from_branches(trees,im_size=1000):
 	H_n_2=int(H_n_rows/2)
 	MAX_SIZE=0
 	for k in range(n_trees):
-		dx,dy,_,_=from_branches_get_max_size(trees[k])
+		dx,dy,_,_,_=from_branches_get_max_size(trees[k])
 		max_size=max(dx,dy)
 		if max_size>MAX_SIZE:
 			MAX_SIZE=max_size
@@ -258,7 +265,7 @@ def draw_trees_from_branches(trees,im_size=1000):
 		for hr in range(n_rows):
 			if i<=len(trees)-1:
 				if len(trees[i])>0:
-					dx,dy,x_mean,y_min=from_branches_get_max_size(trees[i])
+					dx,dy,x_mean,y_min,_=from_branches_get_max_size(trees[i])
 					max_size=max(dx,dy)
 					if max_size==0:
 						print('something went wrong, because max_size is zero')
@@ -286,18 +293,46 @@ def from_branches_get_max_size(branches):
 			min_y=branches[i].sc[1]
 		if branches[i].sc[1]>max_y:
 			max_y=branches[i].sc[1]
-	if len(branches)>0:
-		if branches[-1].ec[0]<min_x:
-			min_x=branches[-1].ec[0]
-		if branches[-1].ec[0]>max_x:
-			max_x=branches[-1].ec[0]
-		if branches[-1].ec[1]<min_y:
-			min_y=branches[-1].ec[1]
-		if branches[-1].ec[1]>max_y:
-			max_y=branches[-1].ec[1]
+		if branches[i].ec[0]<min_x:
+			min_x=branches[i].ec[0]
+		if branches[i].ec[0]>max_x:
+			max_x=branches[i].ec[0]
+		if branches[i].ec[1]<min_y:
+			min_y=branches[i].ec[1]
+		if branches[i].ec[1]>max_y:
+			max_y=branches[i].ec[1]
 
 	x_mean=(max_x+min_x)/2
-	return max_x-min_x,max_y-min_y,x_mean,min_y
+	y_mean=(max_y+min_y)/2
+	return max_x-min_x,max_y-min_y,x_mean,min_y,y_mean
+
+def get_leaf_projection(branches,angle):
+	e_angle=rotation(angle,np.array([1,0]))
+	projected_scalars=[]
+	average_leaf_height=0
+	leaf_radius=0
+	for b in branches:
+		if b.leaf_radius is not None:
+			projected_scalars.append(np.dot(b.ec,e_angle))
+			average_leaf_height
+			average_leaf_height+=b.ec[1]
+			if leaf_radius==0:
+				leaf_radius=b.leaf_radius
+	n_leafs=len(projected_scalars)
+	if n_leafs>0:
+		average_leaf_height/=n_leafs
+	projected_scalars.sort()
+	projected_area=0
+	b=-1e10
+	for s in projected_scalars:
+		if b<s-leaf_radius:
+			projected_area+=2*leaf_radius
+		else:
+			projected_area+=s-b+leaf_radius
+		b=s+leaf_radius
+	return projected_area,n_leafs,average_leaf_height
+
+
 
 def get_max_stress(branches):
 	if len(branches)>0:
@@ -318,6 +353,15 @@ def get_average_stress(branches):
 	else:
 		return 0
 
+def get_euclidean_stress(branches):
+	if len(branches)>0:
+		stress=0
+		for b in branches:
+			stress+=b.stress()**2
+		return np.sqrt(stress)/len(branches)
+	else:
+		return 0
+
 def get_total_mass(branches):
 	if len(branches)>0:
 		mass=0
@@ -328,31 +372,48 @@ def get_total_mass(branches):
 		return 0
 
 
-def get_score(branches,verbose=False):
+def get_score(branches,TI,w,dl,verbose=False):
 	#calculates the score for a given tree described by the given list of branches
-	dx,dy,x_mean,y_min=from_branches_get_max_size(branches)
+	dx,dy,x_mean,y_min,mean_y=from_branches_get_max_size(branches)
 	average_stress=get_average_stress(branches)
 	max_stress=get_max_stress(branches)
-	mass=get_total_mass(branches)
-	a=-10*np.exp(-0.1*dx*dy)#maximize area of tree up to saturation
-	b=-0.1*(dy-3)**2#tree hight is optimal at 3
-	c=-abs(x_mean)**2#symmetry
-	d=min(y_min,0)**3#no branches with negative y-coordinates
-	e=-average_stress
-	f=-max_stress
-	g=-0.1*mass
-	h=0.15*len(branches)**0.5
+	left_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2+np.pi/6)
+	right_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2-np.pi/6)
+	_,_,_,y_min_left,_=from_branches_get_max_size(left_branches)
+	_,_,_,y_min_right,_=from_branches_get_max_size(right_branches)
+	#average_stress_left=get_average_stress(left_branches)
+	max_stress_left=get_max_stress(left_branches)
+	#average_stress_right=get_average_stress(right_branches)
+	max_stress_right=get_max_stress(right_branches)
 
-	score=a+b+c+d+e+f+g+h
+	#wind_stress=0*average_stress_left+0*average_stress_right+0*max_stress_left+0*max_stress_right
+	wind_stress=max_stress_left**3+max_stress_right**3
+	mass=get_total_mass(branches)
+	#a=-10*np.exp(-0.1*dx*dy)#maximize area of tree up to saturation
+	#b=-0.1*(dy-3)**2#tree hight is optimal at 3
+	#c=-abs(x_mean)**2#symmetry
+	#h=0.15*len(branches)**0.5
+	ground=(10*min(y_min,0))**2+0.1*((10*min(y_min_left,0))**2+(10*min(y_min_right,0))**2)#no branches with negative y-coordinates
+	stress=average_stress+max_stress**3+wind_stress
+	
+	tot_p_a=0
+	N=10
+	phi=np.pi/3
+	for i in range(N):
+		projected_area,n_leafs,average_leaf_height=get_leaf_projection(branches,phi*((2*i/N-1)))
+		tot_p_a+=projected_area
+	average_sunlight=6*tot_p_a/N
+	leaf_cost=n_leafs*(TI.leaf_radius**2)
+	energy_loss=-0.3*mass-1*leaf_cost
+	#height=1*max(0,mean_y)**0.5
+	height=1*max(0,average_leaf_height)**0.5
+	score=-ground-stress+energy_loss+average_sunlight+height
 	if verbose:
-		print(a)
-		print(b)
-		print(c)
-		print(d)
-		print(e)
-		print(f)
-		print(g)
-		print(h)
+		print('ground '+str(-ground))
+		print('stress: '+str(-stress))
+		print('energy_loss: '+str(energy_loss))
+		print('average_sunlight: '+str(average_sunlight))
+		print('height: '+str(height))
 	return score
 
 def get_reduced_moment(cumulative_moment):
@@ -376,9 +437,38 @@ def make_gif(pil_images,save_path='tree_evolution.gif',duration=500):
 	              duration=duration,
 	              loop=0)
 
+def list_to_string(l,a=0,b=1):
+	#a,b, the interval
+	string=''
+	for e in l:
+		string+=str(e)[a:b]
+	return string
 
+def get_rotated_stress(branches,angle):
+	rot_branches=[]
+	for b in branches:
+		rot_b=deepcopy(b)
+		rot_sc=rotation(angle,rot_b.sc)
+		rot_ec=rotation(angle,rot_b.ec)
+		rot_b.update_position(rot_sc,rot_ec)
+		rot_branches.append(rot_b)
 
-
+def selection(ls_list,ti_list,n_sel=1):
+	l=len(ls_list)
+	scores=np.zeros(l)
+	trees=[]
+	for i in range(l):
+		w,dl=ls_list[i].evolution('X',ti_list[i].depth)
+		b=ti_list[i].render(w,dl)
+		scores[i]=get_score(b,ti_list[i],w,dl)
+		trees.append(b)
+	sorted_idx=np.argsort(scores)
+	selected_ls=[]
+	selected_ti=[]
+	for j in range(n_sel):
+		selected_ls.append(ls_list[sorted_idx[-1-j]])
+		selected_ti.append(ti_list[sorted_idx[-1-j]])
+	return selected_ls, selected_ti,scores[sorted_idx[-1]],trees[sorted_idx[-1]]
 
 
 
