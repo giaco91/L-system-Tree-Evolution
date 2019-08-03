@@ -10,7 +10,7 @@ from PIL import Image,ExifTags,ImageFilter,ImageOps, ImageDraw, ImageFont
 import PIL
 import numpy as np
 import pickle
-
+from copy import deepcopy
 import matplotlib.pyplot as plt
 
 
@@ -402,13 +402,15 @@ def get_score(branches,TI,w,dl,verbose=False):
 	for i in range(N):
 		projected_area,n_leafs,average_leaf_height=get_leaf_projection(branches,phi*((2*i/N-1)))
 		tot_p_a+=projected_area
-	average_sunlight=6*tot_p_a/N
-	leaf_cost=n_leafs*(TI.leaf_radius**2)
-	energy_loss=-0.3*mass-1*leaf_cost
+	average_sunlight=20*tot_p_a/N
+	#leaf_cost=n_leafs*(TI.leaf_radius**2)
+	leaf_cost=n_leafs*np.exp(6*TI.leaf_radius)#
+	energy_loss=-0.3*mass-leaf_cost
 	#height=1*max(0,mean_y)**0.5
-	height=1*max(0,average_leaf_height)**0.5
+	height=2*max(0,average_leaf_height)**0.5
 	score=-ground-stress+energy_loss+average_sunlight+height
 	if verbose:
+		print('leaf radius: '+str(TI.leaf_radius))
 		print('ground '+str(-ground))
 		print('stress: '+str(-stress))
 		print('energy_loss: '+str(energy_loss))
@@ -453,12 +455,12 @@ def get_rotated_stress(branches,angle):
 		rot_b.update_position(rot_sc,rot_ec)
 		rot_branches.append(rot_b)
 
-def selection(ls_list,ti_list,n_sel=1):
+def selection(ls_list,ti_list,n_sel=1,depth_specific=False):
 	l=len(ls_list)
 	scores=np.zeros(l)
 	trees=[]
 	for i in range(l):
-		w,dl=ls_list[i].evolution('X',ti_list[i].depth)
+		w,dl=ls_list[i].evolution('X',ti_list[i].depth,depth_specific=depth_specific)
 		b=ti_list[i].render(w,dl)
 		scores[i]=get_score(b,ti_list[i],w,dl)
 		trees.append(b)
@@ -469,6 +471,41 @@ def selection(ls_list,ti_list,n_sel=1):
 		selected_ls.append(ls_list[sorted_idx[-1-j]])
 		selected_ti.append(ti_list[sorted_idx[-1-j]])
 	return selected_ls, selected_ti,scores[sorted_idx[-1]],trees[sorted_idx[-1]]
+
+def mutation(selected_ls,selected_ti,n_mut=10,letter=['X'],leaf_specific=False,max_character=15):
+	L=len(selected_ti)
+	mut_ls=[]
+	mut_ti=[]
+	if n_mut<=L:
+		print('Warning: more selected than mutated -> no selection!')
+		mut_ls+=selected_ls[:n_mut]
+		mut_ti+=selected_ti[:n_mut]
+	else:
+		mut_ls+=selected_ls[:L]
+		mut_ti+=selected_ti[:L]
+		i=L
+		while i<=n_mut-1:
+			idx=i%L
+			mut_i_ls=deepcopy(selected_ls[idx])
+			mut_i_ti=deepcopy(selected_ti[idx])
+			mut_i_ti.angle_and_size_mutation()
+			old_depth=mut_i_ti.depth
+			mut_i_ti.depth_mutation(p=0.1,max_depth=4,min_depth=2)
+			new_depth=mut_i_ti.depth
+			if leaf_specific:
+				mut_i_ls.general_mutation('X',p=0.05,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
+				if old_depth!=new_depth:
+					mut_i_ls.add_rule('X'+str(new_depth), mut_i_ls.rule['X'+str(old_depth)])
+					mut_i_ls.rule.pop('X'+str(old_depth))
+				mut_i_ls.general_mutation('X'+str(new_depth),p=0.05,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
+			else:	
+				for l in letter:
+					mut_i_ls.general_mutation(l,p=0.05,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
+			mut_ls.append(mut_i_ls)
+			mut_ti.append(mut_i_ti)
+			i+=1
+	return mut_ls,mut_ti
+
 
 
 

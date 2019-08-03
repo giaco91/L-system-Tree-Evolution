@@ -40,7 +40,7 @@ class L_system():
 		#immune is a set of letter which are immune to point_mutation
 		if self.vocabulary is None:
 			raise ValueError('You must introduce a vocabulary in order to use the point mutation function.')
-		if v not in self.vocabulary:
+		if v not in self.vocabulary  and len(v)<=1:
 			raise ValueError('The leter '+v+' is not in the vocabulary')
 		elif v not in self.rule:
 			print('note that there is no explicite rule for the letter '+v+'. We introduce it as the identity rule.')
@@ -56,7 +56,7 @@ class L_system():
 					self.rule[v]=var
 
 	def perm_mutation(self,v,p):
-		if v not in self.vocabulary:
+		if v not in self.vocabulary and len(v)<=1:
 			raise ValueError('The leter '+v+' is not in the vocabulary')
 		elif v not in self.rule:
 			print('note that there is no explicite rule for the letter '+v+'. We introduce it as the identity rule.')
@@ -72,9 +72,23 @@ class L_system():
 					var+=self.rule[v][i+2:]
 				self.rule[v]=var
 
+	def sample_word(self,extension={},immune={},length=1):
+		extended_set=self.vocabulary.union(extension)
+		extended_set.difference(immune)
+		sampled_word=''
+		i=0
+		while i<=length-1:
+			add=random.sample(extended_set, 1)[0]
+			if add not in immune:
+				sampled_word+=add
+				i+=1
+		return sampled_word
+
+
+
 	def add_mutation(self,v,p,words={},immune={},max_character=12):
 		#words allows to extend the vocabulary by words from which can also be selected
-		if v not in self.vocabulary:
+		if v not in self.vocabulary and len(v)<=1:
 			raise ValueError('The leter '+v+' is not in the vocabulary')
 		elif v not in self.rule:
 			print('note that there is no explicite rule for the letter '+v+'. We introduce it as the identity rule.')
@@ -93,7 +107,7 @@ class L_system():
 			self.rule[v]=new_w
 
 	def loss_mutation(self,v,p,immune={},min_character=2):
-		if v not in self.vocabulary:
+		if v not in self.vocabulary and len(v)<=1:
 			raise ValueError('The leter '+v+' is not in the vocabulary')
 		elif v not in self.rule:
 			print('note that there is no explicite rule for the letter '+v+'. We introduce it as the identity rule.')
@@ -136,7 +150,10 @@ class L_system():
 				for j in range(len(sub)):
 					next_depth_list.append(depth)
 			elif depth_specific and w[i] in self.rule:
-					next_w+=self.rule[w[i]]
+					sub=self.rule[w[i]]
+					next_w+=sub
+					for j in range(len(sub)):
+						next_depth_list.append(depth_list[i])
 					#print('used for default value for rule: '+str(w[i]))
 			else:
 				next_w+=w[i]
@@ -235,7 +252,7 @@ class Depth_specific_tree_interpreter():
 
 
 	def angle_and_size_mutation(self):
-		#self.leaf_radius*=np.random.rand()/2+0.75
+		self.leaf_radius*=np.random.rand()/2+0.75
 		for i in range(self.depth):
 			self.p_angles[i]=min(np.pi,self.p_angles[i]*(np.random.rand()/2+0.75))
 			self.m_angles[i]=max(-np.pi,self.m_angles[i]*(np.random.rand()/2+0.75))
@@ -247,21 +264,9 @@ class Depth_specific_tree_interpreter():
 		r=np.random.rand()
 		if r<p:
 			if self.depth<=max_depth-1:
-			# 	#print('depth increased')
-			# 	self.depth+=1
-			# 	self.p_angles.append(self.p_angles[-1])
-			# 	self.m_angles.append(self.m_angles[-1])
-			# 	self.lengths.append(self.lengths[-1])
-			# 	self.cs.append(self.cs[-1])
 				self.modify_depth(self.depth+1)
 		elif r>(1-p):
 			if self.depth>=min_depth+1:
-				#print('depth decreased')
-				# self.depth-=1
-				# del self.p_angles[-1]
-				# del self.m_angles[-1]
-				# del self.lengths[-1]
-				# del self.cs[-1]
 				self.modify_depth(self.depth-1)
 
 	def modify_depth(self,new_depth):
