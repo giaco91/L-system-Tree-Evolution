@@ -12,27 +12,22 @@ from utils import *
 
 
 
-l_system=L_system()
-l_system.update_vocabulary({'X','F','-','+','[',']'})
+# l_system=L_system()
+# l_system.update_vocabulary({'X','F','-','+','[',']'})
 # l_system.add_rule('X', 'F+[[X]-X]-F[-FX]+X',verbose=True)
-l_system.add_rule('X', 'F[-X]+F',verbose=True)
-
-# l_system.add_rule('X', 'F+[[X]-X]',verbose=True)
-# print(l_system.rule['X'])
-# l_system.perm_mutation('X',1)
-# print(l_system.rule['X'])
+# # l_system.add_rule('X', '[-FX]',verbose=True)
+# # l_system.add_rule('X', '-FX',verbose=True)
 # depth=3
-# l_system.add_rule('X'+str(depth), 'F[X]',verbose=True)
-# print(l_system.rule)
-# TI=Depth_specific_tree_interpreter(depth=depth,plus_angles=[np.pi/8,np.pi/5,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6,-np.pi/5],lengths=[1,1,1],cross_sections=[0.2,0.1,0.05],leaf_density=1)
-# # TI.modify_depth(3)
-# ls_list,ti_list=mutation([l_system],[TI],n_mut=2,leaf_specific=True,max_character=15)
-# print(ls_list[0].rule)
-# print(ls_list[1].rule)
+# # l_system.add_rule('X'+str(depth), 'F[X]',verbose=True)
 
-# w,dl=l_system.evolution('X',3)
-# b=TI.render(w,dl)
+# TI=Depth_specific_tree_interpreter(depth=depth,plus_angles=[np.pi/8,np.pi/5,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6,-np.pi/5],lengths=[1,2,1],cross_sections=[0.01,0.1,0.01],leaf_density=0.01)
+# new_depth=5
+# TI.modify_depth(new_depth)
+# ls_list,ti_list=mutation([l_system],[TI],n_mut=2,leaf_specific=False,max_character=15)
+
+# w,dl=l_system.evolution('X',new_depth)
 # print(w)
+# b=TI.render(w,dl)
 # draw_branches(b,im_size=2000).show()
 
 # raise ValueError('asdf')
@@ -40,18 +35,21 @@ l_system.add_rule('X', 'F[-X]+F',verbose=True)
 for u in range(1):
 	gif_images=[]
 	depth=2
-	n_gen=60
-	depth_specific=True
+	max_depth=3
+	n_gen=50
+	leaf_specific=False
+	depth_specific=leaf_specific
 	l_system=L_system()
 	l_system.update_vocabulary({'X','F','-','+','[',']'})
 	init_w=l_system.sample_word(extension={'[X]','[F]'},immune={'[',']'},length=4)
 	init_w_depth=l_system.sample_word(extension={'[X]','[F]'},immune={'[',']'},length=4)
 	l_system.add_rule('X', init_w,verbose=True)
-	l_system.add_rule('X'+str(depth), init_w,verbose=True)
+	if leaf_specific:
+		l_system.add_rule('X'+str(depth), init_w,verbose=True)
 	TI=Depth_specific_tree_interpreter(depth=depth,plus_angles=[np.pi/8,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=0.01)
 	n_trees=100
-	n_sel=10
-	ls_list,ti_list=mutation([l_system],[TI],n_mut=n_trees,leaf_specific=True,max_character=15)
+	n_sel=5
+	ls_list,ti_list=mutation([l_system],[TI],n_mut=n_trees,leaf_specific=leaf_specific,max_character=15,max_depth=max_depth)
 	for g in range(n_gen):
 		trees=[]
 		w,dl=l_system.evolution('X',ti_list[0].depth,depth_specific=depth_specific)
@@ -65,7 +63,7 @@ for u in range(1):
 			trees.append(branches)
 
 		selected_ls, selected_ti,max_score,best_branches=selection(ls_list,ti_list,n_sel=n_sel,depth_specific=depth_specific)
-		ls_list,ti_list=mutation(selected_ls,selected_ti,n_mut=n_trees,leaf_specific=True,max_character=15)
+		ls_list,ti_list=mutation(selected_ls,selected_ti,n_mut=n_trees,leaf_specific=leaf_specific,max_character=15,max_depth=max_depth)
 		best_ls=selected_ls[0]
 		best_ti=selected_ti[0]
 		
@@ -79,13 +77,13 @@ for u in range(1):
 			best_score=max_score
 			get_score(best_branches,best_ti,w,dl,verbose=True)
 			#im=draw_trees_from_branches(trees,im_size=3000)
-			#im.save('images/branch_tree_gen='+str(g)+'_score='+str(best_score)[0:4]+'.png')
-			print(best_ls.rule)
-			im_best=draw_branches(best_branches,im_size=500,text=['generation: '+str(g),'score: '+str(best_score)[0:5], 'L-gene: '+str(best_ls.rule['X'])])
+			#im.save('images/branch_tree_gen='+str(g)+'_score='+str(best_score)[0:4]+'.png'))
+			text=['generation: '+str(g),'score: '+str(best_score)[0:5], 'L-gene: '+str(best_ls.rule['X']), 'leaf radius: '+str(best_ti.leaf_radius)[0:5]]
+			im_best=draw_branches(best_branches,im_size=500,text=text)
 			#im_best.save('images/best_tree_gen='+str(g)+'_score='+str(best_score)[0:5]+'.png')
 			gif_images.append(im_best)
 		if g==n_gen-1:
-			text=['generation: '+str(g),'score: '+str(best_score)[0:5], 'L-gene: '+str(best_ls.rule['X'])]
+			text=['generation: '+str(g),'score: '+str(best_score)[0:5], 'L-gene: '+str(best_ls.rule['X']), 'leaf radius: '+str(best_ti.leaf_radius)[0:5]]
 			im_best=draw_branches(best_branches,im_size=500,text=text)
 			for i in range(10):
 				gif_images.append(im_best)

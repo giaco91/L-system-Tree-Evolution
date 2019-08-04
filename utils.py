@@ -201,7 +201,7 @@ def draw_trees(trees,im_size=1000,width=1):
 
 
 
-def draw_branches(branches,im_size=1000,text=None,draw_leafs=True,draw_stress=True):
+def draw_branches(branches,im_size=1000,text=None,draw_leafs=True,draw_stress=True, max_stress_only=True):
 	#text must be alist of strings
 	max_stress=get_max_stress(branches)
 	im=create_image(int(1.1*im_size),im_size)
@@ -220,10 +220,19 @@ def draw_branches(branches,im_size=1000,text=None,draw_leafs=True,draw_stress=Tr
 		#print('draw tree...')
 		for i in range(len(branches)):
 			if draw_stress:
-				if branches[i].stress()>0:
-					draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(int(255*branches[i].stress()/max_stress),0,0),width=max(1,int(round(scale*branches[i].cs))))
+				if max_stress_only:
+					if abs(branches[i].stress())==max_stress:
+						if branches[i].stress()>0:
+							draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(int(255*branches[i].stress()/max_stress),0,0),width=max(1,int(round(scale*branches[i].cs))))
+						else:
+							draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,int(-255*branches[i].stress()/max_stress)),width=max(1,int(round(scale*branches[i].cs))))
+					else:
+						draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,0),width=max(1,int(round(scale*branches[i].cs))))
 				else:
-					draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,int(-255*branches[i].stress()/max_stress)),width=max(1,int(round(scale*branches[i].cs))))
+					if branches[i].stress()>0:
+						draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(int(255*branches[i].stress()/max_stress),0,0),width=max(1,int(round(scale*branches[i].cs))))
+					else:
+						draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,int(-255*branches[i].stress()/max_stress)),width=max(1,int(round(scale*branches[i].cs))))
 			else:
 				draw.line([tuple(bias+scale*branches[i].sc),tuple(bias+scale*branches[i].ec)],fill=(0,0,0),width=max(1,int(round(scale*branches[i].cs))))
 			if draw_leafs:
@@ -375,7 +384,7 @@ def get_total_mass(branches):
 def get_score(branches,TI,w,dl,verbose=False):
 	#calculates the score for a given tree described by the given list of branches
 	dx,dy,x_mean,y_min,mean_y=from_branches_get_max_size(branches)
-	average_stress=get_average_stress(branches)
+	#average_stress=get_average_stress(branches)
 	max_stress=get_max_stress(branches)
 	left_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2+np.pi/6)
 	right_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2-np.pi/6)
@@ -387,14 +396,14 @@ def get_score(branches,TI,w,dl,verbose=False):
 	max_stress_right=get_max_stress(right_branches)
 
 	#wind_stress=0*average_stress_left+0*average_stress_right+0*max_stress_left+0*max_stress_right
-	wind_stress=max_stress_left**3+max_stress_right**3
+	wind_stress=np.exp(min(10,max_stress_left))+np.exp(min(10,max_stress_right))
 	mass=get_total_mass(branches)
 	#a=-10*np.exp(-0.1*dx*dy)#maximize area of tree up to saturation
 	#b=-0.1*(dy-3)**2#tree hight is optimal at 3
 	#c=-abs(x_mean)**2#symmetry
 	#h=0.15*len(branches)**0.5
 	ground=(10*min(y_min,0))**2+0.1*((10*min(y_min_left,0))**2+(10*min(y_min_right,0))**2)#no branches with negative y-coordinates
-	stress=average_stress+max_stress**3+wind_stress
+	stress=np.exp(min(10,max_stress))+wind_stress
 	
 	tot_p_a=0
 	N=10
@@ -404,12 +413,13 @@ def get_score(branches,TI,w,dl,verbose=False):
 		tot_p_a+=projected_area
 	average_sunlight=20*tot_p_a/N
 	#leaf_cost=n_leafs*(TI.leaf_radius**2)
-	leaf_cost=n_leafs*np.exp(6*TI.leaf_radius)#
-	energy_loss=-0.3*mass-leaf_cost
+	leaf_cost=n_leafs*np.exp(min(10,6*TI.leaf_radius))#
+	energy_loss=-mass-leaf_cost
 	#height=1*max(0,mean_y)**0.5
 	height=2*max(0,average_leaf_height)**0.5
 	score=-ground-stress+energy_loss+average_sunlight+height
 	if verbose:
+		print('mass loss: '+str(-mass))
 		print('leaf radius: '+str(TI.leaf_radius))
 		print('ground '+str(-ground))
 		print('stress: '+str(-stress))
@@ -472,7 +482,7 @@ def selection(ls_list,ti_list,n_sel=1,depth_specific=False):
 		selected_ti.append(ti_list[sorted_idx[-1-j]])
 	return selected_ls, selected_ti,scores[sorted_idx[-1]],trees[sorted_idx[-1]]
 
-def mutation(selected_ls,selected_ti,n_mut=10,letter=['X'],leaf_specific=False,max_character=15):
+def mutation(selected_ls,selected_ti,n_mut=10,letter=['X'],leaf_specific=False,max_character=15,max_depth=4):
 	L=len(selected_ti)
 	mut_ls=[]
 	mut_ti=[]
@@ -490,14 +500,14 @@ def mutation(selected_ls,selected_ti,n_mut=10,letter=['X'],leaf_specific=False,m
 			mut_i_ti=deepcopy(selected_ti[idx])
 			mut_i_ti.angle_and_size_mutation()
 			old_depth=mut_i_ti.depth
-			mut_i_ti.depth_mutation(p=0.1,max_depth=4,min_depth=2)
+			mut_i_ti.depth_mutation(p=0.1,max_depth=max_depth,min_depth=2)
 			new_depth=mut_i_ti.depth
 			if leaf_specific:
-				mut_i_ls.general_mutation('X',p=0.05,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
+				mut_i_ls.general_mutation('X',p=0.02,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
 				if old_depth!=new_depth:
 					mut_i_ls.add_rule('X'+str(new_depth), mut_i_ls.rule['X'+str(old_depth)])
 					mut_i_ls.rule.pop('X'+str(old_depth))
-				mut_i_ls.general_mutation('X'+str(new_depth),p=0.05,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
+				mut_i_ls.general_mutation('X'+str(new_depth),p=0.02,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
 			else:	
 				for l in letter:
 					mut_i_ls.general_mutation(l,p=0.05,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)

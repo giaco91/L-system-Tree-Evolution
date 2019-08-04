@@ -238,7 +238,7 @@ class Tree_interpreter():
 class Depth_specific_tree_interpreter():
 	#this interpreter turns a string with the standard vocabulary {'X','F','-','+','[',']'} into a set of line segments by the 
 	#rule of turtle walk. However, in this depth specific case the length of the move "F" and the angles "+/-" can depend on the iteration depth
-	def __init__(self,depth=2,plus_angles=[np.pi/8,np.pi/8],minus_angles=[-np.pi/8,np.pi/8],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=0.01):
+	def __init__(self,depth=2,plus_angles=[np.pi/8,np.pi/8],minus_angles=[-np.pi/8,np.pi/8],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=0):
 		if depth!=len(plus_angles) or depth!=len(minus_angles) or depth!=len(lengths) or depth!=len(cross_sections):
 			raise ValueError('the depth must be in accordance with the number of the depth parameters.')
 		self.depth=depth
@@ -311,24 +311,29 @@ class Depth_specific_tree_interpreter():
 				i+=n
 				L,M=get_reduced_moment(cm)
 				for j in range(len(branches)):
+					# print(branches[j].moment)
 					branches[j].add_moment(M*(L-branches[j].sc[0]))
+					# print(branches[j].moment)
 				if len(additional_branches)>0:
 					last_rec=True
 					side_branches+=additional_branches
 			elif w[i]==']':
-				# if len(branches)>0 and len(side_branches)==0:
 				if len(branches)>0 and not last_rec:
 					branches[-1].add_leaf(self.leaf_radius,self.leaf_mass)
+					cumulative_moment.append([branches[-1].ec[0]*self.leaf_mass,self.leaf_mass])
 					for j in range(len(branches)):
+						# print(branches[-1-j].moment)
 						branches[-1-j].add_moment(branches[-1].leaf_mass*(branches[-1].ec[0]-branches[-1-j].sc[0]))
-					#branches[-1].leaf_radius=self.leaf_radius
+						# print(branches[-1-j].moment)
 				return branches+side_branches,i+1,cumulative_moment
 			elif w[i]=='F':
 				last_rec=False
 				next_root=current_root+self.lengths[depth_list[i]]*rotation(current_angle,self.ex)
 				branch=Branch(self.cs[depth_list[i]],current_root,next_root)
 				for j in range(len(branches)):
+					# print(branches[j].moment)
 					branches[j].add_moment(branch.mass*(branch.center_of_mass_coordinates[0]-branches[j].sc[0]))
+					# print(branches[j].moment)
 				cumulative_moment.append([branch.center_of_mass_coordinates[0]*branch.mass,branch.mass])
 				branches.append(branch)
 				current_root=next_root
@@ -338,10 +343,14 @@ class Depth_specific_tree_interpreter():
 				current_angle+=self.m_angles[depth_list[i]]
 			i+=1
 		if len(branches)>0 and not last_rec:
+			# print('add leaf')
+			
 			branches[-1].add_leaf(self.leaf_radius,self.leaf_mass)
+
 			for j in range(len(branches)):
+				# print(branches[-1-j].moment)
 				branches[-1-j].add_moment(branches[-1].leaf_mass*(branches[-1].ec[0]-branches[-1-j].sc[0]))
-			#branches[-1].leaf_radius=self.leaf_radius
+				# print(branches[-1-j].moment)
 		return branches+side_branches,length_w,cumulative_moment
 
 class Branch():
