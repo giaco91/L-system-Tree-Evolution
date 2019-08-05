@@ -310,6 +310,7 @@ class Depth_specific_tree_interpreter():
 				additional_branches, n,cm=self.rendering_recursion(current_root,current_angle,w[i+1:],depth_list[i+1:])
 				i+=n
 				L,M=get_reduced_moment(cm)
+				cumulative_moment+=cm
 				for j in range(len(branches)):
 					# print(branches[j].moment)
 					branches[j].add_moment(M*(L-branches[j].sc[0]))

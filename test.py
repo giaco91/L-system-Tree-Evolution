@@ -14,14 +14,16 @@ from utils import *
 
 # l_system=L_system()
 # l_system.update_vocabulary({'X','F','-','+','[',']'})
-# l_system.add_rule('X', 'F+[[X]-X]-F[-FX]+X',verbose=True)
+# # l_system.add_rule('X', 'F+[[X]-X]-F[-FX]+X',verbose=True)
 # # l_system.add_rule('X', '[-FX]',verbose=True)
-# # l_system.add_rule('X', '-FX',verbose=True)
+# l_system.add_rule('X', '[-F[X]]',verbose=True)
+# # l_system.add_rule('X', '-F[[-F]]',verbose=True)
+
 # depth=3
 # # l_system.add_rule('X'+str(depth), 'F[X]',verbose=True)
 
-# TI=Depth_specific_tree_interpreter(depth=depth,plus_angles=[np.pi/8,np.pi/5,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6,-np.pi/5],lengths=[1,2,1],cross_sections=[0.01,0.1,0.01],leaf_density=0.01)
-# new_depth=5
+# TI=Depth_specific_tree_interpreter(depth=depth,plus_angles=[np.pi/8,np.pi/5,np.pi/5],minus_angles=[-np.pi/4,-np.pi/6,-np.pi/5],lengths=[1,1,1],cross_sections=[0.01,0.02,0.01],leaf_density=0.01)
+# new_depth=2
 # TI.modify_depth(new_depth)
 # ls_list,ti_list=mutation([l_system],[TI],n_mut=2,leaf_specific=False,max_character=15)
 
@@ -32,12 +34,16 @@ from utils import *
 
 # raise ValueError('asdf')
 
-for u in range(1):
+
+init_depth=2
+max_depth=5
+n_gen=70
+leaf_specific=False
+n_trees=100
+n_sel=2
+leaf_density=0.01
+for u in range(4):
 	gif_images=[]
-	depth=2
-	max_depth=3
-	n_gen=50
-	leaf_specific=False
 	depth_specific=leaf_specific
 	l_system=L_system()
 	l_system.update_vocabulary({'X','F','-','+','[',']'})
@@ -45,10 +51,8 @@ for u in range(1):
 	init_w_depth=l_system.sample_word(extension={'[X]','[F]'},immune={'[',']'},length=4)
 	l_system.add_rule('X', init_w,verbose=True)
 	if leaf_specific:
-		l_system.add_rule('X'+str(depth), init_w,verbose=True)
-	TI=Depth_specific_tree_interpreter(depth=depth,plus_angles=[np.pi/8,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=0.01)
-	n_trees=100
-	n_sel=5
+		l_system.add_rule('X'+str(init_depth), init_w,verbose=True)
+	TI=Depth_specific_tree_interpreter(depth=init_depth,plus_angles=[np.pi/8,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=leaf_density)
 	ls_list,ti_list=mutation([l_system],[TI],n_mut=n_trees,leaf_specific=leaf_specific,max_character=15,max_depth=max_depth)
 	for g in range(n_gen):
 		trees=[]
