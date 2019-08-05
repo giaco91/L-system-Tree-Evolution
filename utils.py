@@ -80,53 +80,6 @@ def angle_between(v1, v2):
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
 
-def pack_sequences(data,with_alpha=False):
-	#the data is a list of sequences. Every sequence is it self a list of data points.
-    #the data must be preprocessed in order to use nn.utils.rnn.pack_padded_sequence
-    #sequence size:(batchsize,max_seq_length,data_dim)
-    n_sequences=len(data)
-    sequence_lengths=np.zeros(n_sequences).astype(int)
-    for i in range(n_sequences):
-    	sequence_lengths[i]=int(len(data[i]))
-    sorted_idx=np.argsort(sequence_lengths)
-    sorted_sequence_lengths=[]
-    data_batch=torch.zeros(n_sequences,sequence_lengths[sorted_idx[-1]],5)
-    for i in range(n_sequences):
-    	if with_alpha:
-    		data_idx=np.asarray([0,1,2,4,5,6])
-    	else:
-    		data_idx=np.asarray([0,1,2,4,5])
-    	data_batch[i,0:sequence_lengths[sorted_idx[-1-i]],:]=torch.from_numpy(np.asarray(data[sorted_idx[-1-i]])[:,data_idx])
-    	sorted_sequence_lengths.append(sequence_lengths[sorted_idx[-1-i]])
-    packed_data_batch = nn.utils.rnn.pack_padded_sequence(data_batch, sorted_sequence_lengths, batch_first=True)
-    return packed_data_batch
-
-
-def unpack_sequences(data_packed):
-    #the inverse of pack sequences
-    data, seq_lengths= nn.utils.rnn.pad_packed_sequence(data_packed, batch_first=True)
-    return data,seq_lengths
-
-def get_shifted_background(background_im,scaled_ds):
-	fade_step=10
-	W,H=background_im.size
-	new_background_im=background_im.copy()
-	px=background_im.load()
-	new_px=new_background_im.load()
-	for w in range(W):
-		for h in range(H):
-			if px[w,h]==(230,200,0):
-				px[w,h]=(255,255,255)
-			elif px[w,h]!=(255,255,255):
-				px[w,h]=(min(px[w,h][0]+fade_step,255),min(px[w,h][1]+fade_step,255),min(px[w,h][2]+fade_step,255))
-	for w in range(W):
-		for h in range(H):
-			shifted_w_idx=round(w+scaled_ds[0])
-			shifted_h_idx=round(h+scaled_ds[1])
-			if 0<=shifted_w_idx<=W-1 and 0<=shifted_h_idx<=H-1:
-				new_px[w,h]=px[shifted_w_idx,shifted_h_idx]
-	return new_background_im
-
 def get_max_size(line_segments):
 	min_x=0
 	max_x=0
@@ -199,12 +152,42 @@ def draw_trees(trees,im_size=1000,width=1):
 			i+=1
 	return reflect_y_axis(im)
 
+def draw_sequence_of_branches(branches_list,text_list,im_size=1000,draw_leafs=True,draw_stress=True, max_stress_only=True):
+	image_list=[]
+	global_max_size=0
+	global_x_min=0
+	global_x_max=0
+	global_y_min=0
+	global_y_max=0
+	global_x_mean=0
+	global_y_min=0
+	W_2=int(im_size/2)
+	H_2=W_2
+	for b in branches_list:
+		min_x,max_x,min_y,max_y=from_branches_get_max_size(b,get_extreme_only=True)
+		if global_x_min>min_x:
+			global_x_min=min_x
+		if global_x_max<max_x:
+			global_x_max=max_x
+		if global_y_min>min_y:
+			global_y_min=min_y
+		if global_y_max<max_y:
+			global_y_max=max_y
+	global_max_size=max(global_x_max-global_x_min,global_y_max-global_y_min)
+	scale=0.7*im_size/global_max_size
+	if global_max_size/2<global_x_max:
+		global_x_mean=global_x_max-global_max_size/2
+	elif global_max_size/2<-global_x_min:
+		global_x_mean=global_max_size/2-global_x_max
+	bias=np.array([0.4*im_size+W_2-scale*global_x_mean,0.05*im_size-scale*global_y_min])
+	for i in range(len(branches_list)):
+		image_list.append(draw_branches(branches_list[i],im_size=im_size,text=text_list[i],draw_leafs=draw_leafs,draw_stress=draw_stress, max_stress_only=max_stress_only,scale=scale,bias=bias))
+	return image_list
 
-
-def draw_branches(branches,im_size=1000,text=None,draw_leafs=True,draw_stress=True, max_stress_only=True):
+def draw_branches(branches,im_size=1000,text=None,draw_leafs=True,draw_stress=True, max_stress_only=True,scale=None,bias=None):
 	#text must be alist of strings
 	max_stress=get_max_stress(branches)
-	im=create_image(int(1.1*im_size),im_size)
+	im=create_image(int(1.4*im_size),im_size)
 	draw = ImageDraw.Draw(im)
 	if len(branches)>0:
 		dx,dy,x_mean,y_min,_=from_branches_get_max_size(branches)
@@ -212,11 +195,12 @@ def draw_branches(branches,im_size=1000,text=None,draw_leafs=True,draw_stress=Tr
 		if max_size==0:
 			print('something went wrong, because max_size is zero')
 			max_size=1
-		scale=0.7*im_size/max_size
 		#W,H=im.size
 		W_2=int(im_size/2)
 		H_2=W_2
-		bias=np.array([0.1*im_size+W_2-scale*x_mean,0.05*im_size-scale*y_min])
+		if scale is None or bias is None:
+			scale=0.7*im_size/max_size
+			bias=np.array([0.4*im_size+W_2-scale*x_mean,0.05*im_size-scale*y_min])
 		#print('draw tree...')
 		for i in range(len(branches)):
 			if draw_stress:
@@ -288,7 +272,7 @@ def draw_trees_from_branches(trees,im_size=1000):
 	return reflect_y_axis(im)
 
 
-def from_branches_get_max_size(branches):
+def from_branches_get_max_size(branches,get_extreme_only=False):
 	min_x=0
 	max_x=0
 	min_y=0
@@ -310,9 +294,12 @@ def from_branches_get_max_size(branches):
 			min_y=branches[i].ec[1]
 		if branches[i].ec[1]>max_y:
 			max_y=branches[i].ec[1]
+	if get_extreme_only:
+		return min_x,max_x,min_y,max_y
 
 	x_mean=(max_x+min_x)/2
 	y_mean=(max_y+min_y)/2
+
 	return max_x-min_x,max_y-min_y,x_mean,min_y,y_mean
 
 def get_leaf_projection(branches,angle):
@@ -394,16 +381,16 @@ def get_score(branches,TI,w,dl,verbose=False):
 	max_stress_left=get_max_stress(left_branches)
 	#average_stress_right=get_average_stress(right_branches)
 	max_stress_right=get_max_stress(right_branches)
-
+	stress_exponent=0.3
 	#wind_stress=0*average_stress_left+0*average_stress_right+0*max_stress_left+0*max_stress_right
-	wind_stress=np.exp(min(10,max_stress_left))+np.exp(min(10,max_stress_right))
+	wind_stress=np.exp(stress_exponent*min(10,max_stress_left))+np.exp(stress_exponent*min(10,max_stress_right))
 	mass=get_total_mass(branches)
 	#a=-10*np.exp(-0.1*dx*dy)#maximize area of tree up to saturation
 	#b=-0.1*(dy-3)**2#tree hight is optimal at 3
 	#c=-abs(x_mean)**2#symmetry
 	#h=0.15*len(branches)**0.5
 	ground=(10*min(y_min,0))**2+0.1*((10*min(y_min_left,0))**2+(10*min(y_min_right,0))**2)#no branches with negative y-coordinates
-	stress=np.exp(min(10,max_stress))+wind_stress
+	stress=np.exp(stress_exponent*min(10,max_stress))+wind_stress
 	
 	tot_p_a=0
 	N=10
@@ -412,11 +399,12 @@ def get_score(branches,TI,w,dl,verbose=False):
 		projected_area,n_leafs,average_leaf_height=get_leaf_projection(branches,phi*((2*i/N-1)))
 		tot_p_a+=projected_area
 	average_sunlight=20*tot_p_a/N
+	_,_,average_leaf_height=get_leaf_projection(branches,0)
 	#leaf_cost=n_leafs*(TI.leaf_radius**2)
 	leaf_cost=n_leafs*np.exp(min(10,6*TI.leaf_radius))#
 	energy_loss=-mass-leaf_cost
 	#height=1*max(0,mean_y)**0.5
-	height=2*max(0,average_leaf_height)**0.5
+	height=10*(1-np.exp(-min(10,max(0,average_leaf_height))))
 	score=-ground-stress+energy_loss+average_sunlight+height
 	if verbose:
 		print('mass loss: '+str(-mass))
