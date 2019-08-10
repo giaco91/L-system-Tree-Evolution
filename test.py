@@ -34,15 +34,15 @@ from utils import *
 
 # raise ValueError('asdf')
 
-n_rep=4
-n_gen=40
+n_rep=3
+n_gen=200
 n_trees=100
 n_sel=1
 
 init_depth=2
-max_depth=5
+max_depth=4
 leaf_specific=False
-leaf_density=0.005
+leaf_density=0
 for u in range(n_rep):
 	#gif_images=[]
 	text_list=[]
@@ -56,7 +56,8 @@ for u in range(n_rep):
 	if leaf_specific:
 		init_w_depth=l_system.sample_word(extension={'[X]','[F]'},immune={'[',']'},length=4)
 		l_system.add_rule('X'+str(init_depth), init_w,verbose=True)
-	TI=Depth_specific_tree_interpreter(depth=init_depth,plus_angles=[np.pi/8,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=leaf_density)
+	TI=Depth_specific_tree_interpreter(depth=2,plus_angles=[np.pi/8,np.pi/5],minus_angles=[-np.pi/8,-np.pi/6],lengths=[1,1],cross_sections=[0.1,0.1],leaf_radius=0.2,leaf_density=leaf_density)
+	TI.modify_depth(init_depth)
 	ls_list,ti_list=mutation([l_system],[TI],n_mut=n_trees,leaf_specific=leaf_specific,max_character=15,max_depth=max_depth)
 	best_score=-1e10
 	for g in range(n_gen):

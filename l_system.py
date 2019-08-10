@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 from utils import *
 
 
-#–---CAR-----
 class L_system():
 	def __init__(self,rule={},vocabulary=None):
 		self.vocabulary=vocabulary#the vocabulary does not need to explicitely specified since it is implied by the axiom and the rule
@@ -288,54 +287,72 @@ class Depth_specific_tree_interpreter():
 				del self.cs[-1]
 
 
-	def render(self,w,depth_list,starting_root=np.array([0,0]),starting_angle=np.pi/2):
+	def render(self,w,depth_list,starting_root=np.array([0,0]),starting_angle=np.pi/2,side_force=None):
 		#w must be a word over the standard alphabet
 		#returns a list of branch objects 
 		#the starting point is (0,0) and starting direction is (0,1)
 		#print('calculate branch objects ...')
-		branches,_,_=self.rendering_recursion(starting_root,starting_angle,w,depth_list)
+		branches,_,_,_=self.rendering_recursion(starting_root,starting_angle,w,depth_list,side_force=side_force)
 		return branches
 
-	def rendering_recursion(self,root,root_angle,w,depth_list):
+	def rendering_recursion(self,root,root_angle,w,depth_list,side_force=None):
+		#side_force points to east. Hence, a negative side_force points to west
 		current_angle=root_angle
 		current_root=root
 		branches=[]
 		side_branches=[]
 		i=0
-		cumulative_moment=[]#the accumulated moments with respect to the origin in the form of nested lists [[l1*m1,m1],[l2*m2,m2],...,]
+		cumulative_moment_x=[]#the accumulated moments with respect to the origin in the form of nested lists [[l1*m1,m1],[l2*m2,m2],...,]
+		cumulative_moment_y=[]
 		length_w=len(w)
 		last_rec=False
 		while i<=length_w-1:
 			if w[i]=='[':
-				additional_branches, n,cm=self.rendering_recursion(current_root,current_angle,w[i+1:],depth_list[i+1:])
+				additional_branches, n,cm_x,cm_y=self.rendering_recursion(current_root,current_angle,w[i+1:],depth_list[i+1:])
 				i+=n
-				L,M=get_reduced_moment(cm)
-				cumulative_moment+=cm
+				L,M=get_reduced_moment(cm_x)
+				if side_force is not None:
+					L_y,F_y=get_reduced_moment(cm_y)
+				cumulative_moment_x+=cm_x
 				for j in range(len(branches)):
 					# print(branches[j].moment)
 					branches[j].add_moment(M*(L-branches[j].sc[0]))
+					if side_force is not None:
+						branches[j].add_moment(F_y*(L_y-branches[j].sc[1]))
 					# print(branches[j].moment)
 				if len(additional_branches)>0:
 					last_rec=True
 					side_branches+=additional_branches
 			elif w[i]==']':
 				if len(branches)>0 and not last_rec:
+					#add leaf
 					branches[-1].add_leaf(self.leaf_radius,self.leaf_mass)
-					cumulative_moment.append([branches[-1].ec[0]*self.leaf_mass,self.leaf_mass])
+					cumulative_moment_x.append([branches[-1].ec[0]*self.leaf_mass,self.leaf_mass])
+					if side_force is not None:
+						cumulative_moment_y.append([branches[-1].ec[1]*(self.leaf_radius**2)*side_force,(self.leaf_radius**2)*side_force])
 					for j in range(len(branches)):
 						# print(branches[-1-j].moment)
 						branches[-1-j].add_moment(branches[-1].leaf_mass*(branches[-1].ec[0]-branches[-1-j].sc[0]))
+						if side_force is not None:
+							branches[-1-j].add_moment((self.leaf_radius**2)*side_force*(branches[-1].ec[1]-branches[-1-j].sc[1]))
 						# print(branches[-1-j].moment)
-				return branches+side_branches,i+1,cumulative_moment
+				return branches+side_branches,i+1,cumulative_moment_x,cumulative_moment_y
 			elif w[i]=='F':
 				last_rec=False
 				next_root=current_root+self.lengths[depth_list[i]]*rotation(current_angle,self.ex)
 				branch=Branch(self.cs[depth_list[i]],current_root,next_root)
+				if side_force is not None:
+					branch.add_moment(side_force*(branch.ec[1]-branch.sc[1])*np.sqrt(branch.cs)*(branch.center_of_mass_coordinates[1]-branch.sc[1]))
 				for j in range(len(branches)):
 					# print(branches[j].moment)
 					branches[j].add_moment(branch.mass*(branch.center_of_mass_coordinates[0]-branches[j].sc[0]))
+					if side_force is not None:
+						branches[j].add_moment(side_force*(branch.ec[1]-branch.sc[1])*np.sqrt(branch.cs)*(branch.center_of_mass_coordinates[1]-branches[j].sc[1]))
 					# print(branches[j].moment)
-				cumulative_moment.append([branch.center_of_mass_coordinates[0]*branch.mass,branch.mass])
+				cumulative_moment_x.append([branch.center_of_mass_coordinates[0]*branch.mass,branch.mass])
+				if side_force is not None:
+					force=side_force*(branch.ec[1]-branch.sc[1])*np.sqrt(branch.cs)
+					cumulative_moment_y.append([branch.center_of_mass_coordinates[1]*force,force])
 				branches.append(branch)
 				current_root=next_root
 			elif w[i]=='+':
@@ -344,15 +361,15 @@ class Depth_specific_tree_interpreter():
 				current_angle+=self.m_angles[depth_list[i]]
 			i+=1
 		if len(branches)>0 and not last_rec:
-			# print('add leaf')
-			
+			#add leaf
 			branches[-1].add_leaf(self.leaf_radius,self.leaf_mass)
-
 			for j in range(len(branches)):
 				# print(branches[-1-j].moment)
 				branches[-1-j].add_moment(branches[-1].leaf_mass*(branches[-1].ec[0]-branches[-1-j].sc[0]))
+				if side_force is not None:
+					branches[-1-j].add_moment((self.leaf_radius**2)*side_force*(branches[-1].ec[1]-branches[-1-j].sc[1]))
 				# print(branches[-1-j].moment)
-		return branches+side_branches,length_w,cumulative_moment
+		return branches+side_branches,length_w,cumulative_moment_x,cumulative_moment_y
 
 class Branch():
 	#this interpreter turns a string with the standard vocabulary {'X','F','-','+','[',']'} into a set of line segments by the 

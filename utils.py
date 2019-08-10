@@ -174,7 +174,7 @@ def draw_sequence_of_branches(branches_list,text_list,im_size=1000,draw_leafs=Tr
 		if global_y_max<max_y:
 			global_y_max=max_y
 	global_max_size=max(global_x_max-global_x_min,global_y_max-global_y_min)
-	scale=0.7*im_size/global_max_size
+	scale=0.7*im_size/(global_max_size+1e-10)
 	if global_max_size/2<global_x_max:
 		global_x_mean=global_x_max-global_max_size/2
 	elif global_max_size/2<-global_x_min:
@@ -373,24 +373,29 @@ def get_score(branches,TI,w,dl,verbose=False):
 	dx,dy,x_mean,y_min,mean_y=from_branches_get_max_size(branches)
 	#average_stress=get_average_stress(branches)
 	max_stress=get_max_stress(branches)
-	left_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2+np.pi/6)
-	right_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2-np.pi/6)
+	left_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2+np.pi/4)
+	right_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2-np.pi/4)
+	left_wind_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=0,side_force=0.1)
+	right_wind_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=0,side_force=-0.1)
 	_,_,_,y_min_left,_=from_branches_get_max_size(left_branches)
 	_,_,_,y_min_right,_=from_branches_get_max_size(right_branches)
 	#average_stress_left=get_average_stress(left_branches)
 	max_stress_left=get_max_stress(left_branches)
+	max_stress_left_wind=get_max_stress(left_wind_branches)
 	#average_stress_right=get_average_stress(right_branches)
 	max_stress_right=get_max_stress(right_branches)
+	max_stress_right_wind=get_max_stress(right_wind_branches)
 	stress_exponent=0.3
 	#wind_stress=0*average_stress_left+0*average_stress_right+0*max_stress_left+0*max_stress_right
 	wind_stress=np.exp(stress_exponent*min(10,max_stress_left))+np.exp(stress_exponent*min(10,max_stress_right))
+	wind_stress+=np.exp(stress_exponent*min(10,max_stress_left_wind))+np.exp(stress_exponent*min(10,max_stress_right_wind))
 	mass=get_total_mass(branches)
 	#a=-10*np.exp(-0.1*dx*dy)#maximize area of tree up to saturation
 	#b=-0.1*(dy-3)**2#tree hight is optimal at 3
 	#c=-abs(x_mean)**2#symmetry
 	#h=0.15*len(branches)**0.5
 	ground=(10*min(y_min,0))**2+0.1*((10*min(y_min_left,0))**2+(10*min(y_min_right,0))**2)#no branches with negative y-coordinates
-	stress=np.exp(stress_exponent*min(10,max_stress))+wind_stress
+	stress=2*(np.exp(stress_exponent*min(10,max_stress))+wind_stress)
 	
 	tot_p_a=0
 	N=10
@@ -398,7 +403,7 @@ def get_score(branches,TI,w,dl,verbose=False):
 	for i in range(N):
 		projected_area,n_leafs,average_leaf_height=get_leaf_projection(branches,phi*((2*i/N-1)))
 		tot_p_a+=projected_area
-	average_sunlight=20*tot_p_a/N
+	average_sunlight=30*tot_p_a/N
 	_,_,average_leaf_height=get_leaf_projection(branches,0)
 	#leaf_cost=n_leafs*(TI.leaf_radius**2)
 	leaf_cost=n_leafs*np.exp(min(10,6*TI.leaf_radius))#
@@ -417,17 +422,17 @@ def get_score(branches,TI,w,dl,verbose=False):
 	return score
 
 def get_reduced_moment(cumulative_moment):
-	#cumulative_momentthe accumulated moments with respect to the origin in the form of nested lists [[l1*m1,m1],[l2*m2,m2],...,]
-	#we want to calculate the equivalent reduced form L*M=l1*m1+l2*m2+...
-	M=0
+	#cumulative_momentthe accumulated moments with respect to the origin in the form of nested lists [[l1*f1,f1],[l2*f2,f2],...,]
+	#we want to calculate the equivalent reduced form L*F=l1*f1+l2*f2+...
+	F=0
 	lm=0
 	L=0
 	for i in range(len(cumulative_moment)):
 		lm+=cumulative_moment[i][0]
-		M+=cumulative_moment[i][1]
+		F+=cumulative_moment[i][1]
 	if len(cumulative_moment)>0:
-		L=lm/M
-	return L,M
+		L=lm/F
+	return L,F
 
 def make_gif(pil_images,save_path='tree_evolution.gif',duration=500):
 	print('create gif ...')
@@ -498,7 +503,11 @@ def mutation(selected_ls,selected_ti,n_mut=10,letter=['X'],leaf_specific=False,m
 				mut_i_ls.general_mutation('X'+str(new_depth),p=0.02,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
 			else:	
 				for l in letter:
+					old_str=mut_i_ls.rule['X']
 					mut_i_ls.general_mutation(l,p=0.05,immune={'[',']'},words={'[X]','[F]'},max_character=max_character)
+					if mut_i_ls.rule['X'].count('X')>=5:
+						# print('too many X: '+mut_i_ls.rule['X']+'. Changed to: '+old_str)
+						mut_i_ls.rule['X']=old_str
 			mut_ls.append(mut_i_ls)
 			mut_ti.append(mut_i_ti)
 			i+=1
