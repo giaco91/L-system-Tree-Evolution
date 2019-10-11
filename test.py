@@ -35,7 +35,7 @@ from utils import *
 # raise ValueError('asdf')
 
 n_rep=3
-n_gen=200
+n_gen=60
 n_trees=100
 n_sel=1
 

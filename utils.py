@@ -126,7 +126,7 @@ def draw_tree(line_segments,im_size=500,width=1):
 			draw.line([tuple(bias+scale*line_segments[i][0]),tuple(bias+scale*line_segments[i][1])],fill=(30,80,0),width=width)
 	return reflect_y_axis(im)
 
-def draw_trees(trees,im_size=1000,width=1):
+def draw_trees(trees,im_size=500,width=1):
 	#trees is a list of line_segments for each tree
 	im=create_image(im_size,im_size)
 	draw = ImageDraw.Draw(im)
@@ -375,8 +375,8 @@ def get_score(branches,TI,w,dl,verbose=False):
 	max_stress=get_max_stress(branches)
 	left_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2+np.pi/4)
 	right_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=np.pi/2-np.pi/4)
-	left_wind_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=0,side_force=0.1)
-	right_wind_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=0,side_force=-0.1)
+	left_wind_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=0,side_force=0.2)
+	right_wind_branches=TI.render(w,dl,starting_root=np.array([0,0]),starting_angle=0,side_force=-0.2)
 	_,_,_,y_min_left,_=from_branches_get_max_size(left_branches)
 	_,_,_,y_min_right,_=from_branches_get_max_size(right_branches)
 	#average_stress_left=get_average_stress(left_branches)
@@ -388,7 +388,8 @@ def get_score(branches,TI,w,dl,verbose=False):
 	stress_exponent=0.3
 	#wind_stress=0*average_stress_left+0*average_stress_right+0*max_stress_left+0*max_stress_right
 	wind_stress=np.exp(stress_exponent*min(10,max_stress_left))+np.exp(stress_exponent*min(10,max_stress_right))
-	wind_stress+=np.exp(stress_exponent*min(10,max_stress_left_wind))+np.exp(stress_exponent*min(10,max_stress_right_wind))
+	side_wind_stress=np.exp(stress_exponent*min(10,max_stress_left_wind))+np.exp(stress_exponent*min(10,max_stress_right_wind))
+	wind_stress+=side_wind_stress
 	mass=get_total_mass(branches)
 	#a=-10*np.exp(-0.1*dx*dy)#maximize area of tree up to saturation
 	#b=-0.1*(dy-3)**2#tree hight is optimal at 3
@@ -410,8 +411,9 @@ def get_score(branches,TI,w,dl,verbose=False):
 	energy_loss=-mass-leaf_cost
 	#height=1*max(0,mean_y)**0.5
 	height=10*(1-np.exp(-min(10,max(0,average_leaf_height))))
-	score=-ground-stress+energy_loss+average_sunlight+height
+	score=-ground-stress+energy_loss+average_sunlight+height+n_leafs**0.5
 	if verbose:
+		print('side_wind_stress: '+str(side_wind_stress))
 		print('mass loss: '+str(-mass))
 		print('leaf radius: '+str(TI.leaf_radius))
 		print('ground '+str(-ground))
