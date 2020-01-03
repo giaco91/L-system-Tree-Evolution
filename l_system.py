@@ -204,7 +204,7 @@ class Tree_interpreter():
 		line_segments,_=self.rendering_recursion(starting_root,starting_angle,w)
 		return line_segments
 
-	def rendering_recursion(self,root,root_angle,w):
+	def rendering_recursion(self,root,root_angle,w,depth=1):
 		current_angle=root_angle
 		current_root=root
 		line_segments=[]
@@ -212,14 +212,15 @@ class Tree_interpreter():
 		length_w=len(w)
 		while i<=length_w-1:
 			if w[i]=='[':
-				additional_line_segments, n=self.rendering_recursion(current_root,current_angle,w[i+1:])
+				depth+=1
+				additional_line_segments, n=self.rendering_recursion(current_root,current_angle,w[i+1:],depth)
 				line_segments+=additional_line_segments
 				i+=n
 			elif w[i]==']':
 				return line_segments,i+1
 			elif w[i]=='F':
 				next_root=current_root+rotation(current_angle,self.ex)
-				line_segments.append([current_root,next_root])
+				line_segments.append([current_root,next_root,depth])
 				current_root=next_root
 			elif w[i]=='+':
 				if self.randomize:

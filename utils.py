@@ -125,7 +125,12 @@ def draw_tree(line_segments,im_size=500,width=1):
 		for i in range(len(line_segments)):
 			coord1=bias+scale*line_segments[i][0]
 			coord2=bias+scale*line_segments[i][1]
-			draw.line([tuple(coord1),tuple(coord2)],fill=(20,70,10),width=width)
+			depth=line_segments[i][2]
+			# d=np.sqrt(np.sum(np.power(coord1-coord2,2)))
+			# width=max(1,int(d/5))
+			width=max(1,15-2*depth)
+			color=(max(0,100-int(5*depth)),min(255,10+int(depth*10)),10)
+			draw.line([tuple(coord1),tuple(coord2)],fill=color,width=width)
 	return reflect_y_axis(im)
 
 def draw_trees(trees,im_size=500,width=1):
