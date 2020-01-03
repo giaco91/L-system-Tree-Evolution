@@ -123,7 +123,9 @@ def draw_tree(line_segments,im_size=500,width=1):
 		draw = ImageDraw.Draw(im)
 		#print('draw tree...')
 		for i in range(len(line_segments)):
-			draw.line([tuple(bias+scale*line_segments[i][0]),tuple(bias+scale*line_segments[i][1])],fill=(30,80,0),width=width)
+			coord1=bias+scale*line_segments[i][0]
+			coord2=bias+scale*line_segments[i][1]
+			draw.line([tuple(coord1),tuple(coord2)],fill=(20,70,10),width=width)
 	return reflect_y_axis(im)
 
 def draw_trees(trees,im_size=500,width=1):

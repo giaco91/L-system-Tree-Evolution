@@ -16,7 +16,7 @@ from utils import *
 class L_system():
 	def __init__(self,rule={},vocabulary=None):
 		self.vocabulary=vocabulary#the vocabulary does not need to explicitely specified since it is implied by the axiom and the rule
-		self.rule=rule#a dictionary of maps from an element of the vocabulary to the space of words under the vocabulary.
+		self.rule=rule#a dictionary of maps from an element of the vocabulary to the space of words constructed by the vocabulary.
 
 	def update_vocabulary(self, V):
 		#V is a set of vocabs.
@@ -28,9 +28,9 @@ class L_system():
 	def remove_vocab(self,v):
 		#v is a single vocab
 		if self.vocabulary is None:
-			print('The vocab can not removed because the vocabulary is not defined')
+			print('The vocab can not be removed because the vocabulary is not defined')
 		elif v not in self.vocabulary:
-			print('The vocab can not removed because the vocabulary does not contain it')
+			print('The vocab can not be removed because the vocabulary does not contain it')
 		else:
 			self.covabulary.discard(v)
 
@@ -189,8 +189,10 @@ class Tree_interpreter():
 		self.ex=np.array([1,0])
 
 	def angle_mutation(self):
-		self.p_angle*=np.random.rand()/2+0.75
-		self.m_angle*=np.random.rand()/2+0.75
+		# self.p_angle*=np.random.rand()/2+0.75
+		# self.m_angle*=np.random.rand()/2+0.75
+		self.p_angle=min(np.pi,self.p_angle*(np.random.rand()/2+0.75))
+		self.m_angle=max(-np.pi,self.m_angle*(np.random.rand()/2+0.75))
 
 	def render(self,w):
 		#w must be a word over the standard alphabet
