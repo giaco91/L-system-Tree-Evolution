@@ -374,6 +374,21 @@ def get_total_mass(branches):
 	else:
 		return 0
 
+def get_morph_score(branches,TI,w,dl,verbose=False,ground=True):
+	dx,dy,x_mean,y_min,y_mean=from_branches_get_max_size(branches)
+	area_score=dx*dy
+	stability_score_x=-(x_mean)**4
+	stability_score_y=-(y_mean-3)**4
+	stability_score=stability_score_x+stability_score_y
+	if verbose:
+		print('area score: ',str(area_score))
+		print('stability_score x: ',str(stability_score_x))
+		print('stability_score y: ',str(stability_score_y))
+	if ground:
+		ground_score=-10*min(y_min,0)**2
+		if verbose:
+			print('ground score: ',str(ground_score))
+	return area_score + ground_score +stability_score
 
 def get_score(branches,TI,w,dl,verbose=False):
 	#calculates the score for a given tree described by the given list of branches
@@ -467,15 +482,15 @@ def get_rotated_stress(branches,angle):
 		rot_b.update_position(rot_sc,rot_ec)
 		rot_branches.append(rot_b)
 
-def selection(ls_list,ti_list,n_sel=1,depth_specific=False):
-	l=len(ls_list)
+def selection(ls_list,ti_list,w_list,dl_list,trees,n_sel=1):
+	l=len(ti_list)
 	scores=np.zeros(l)
-	trees=[]
 	for i in range(l):
-		w,dl=ls_list[i].evolution('X',ti_list[i].depth,depth_specific=depth_specific)
-		b=ti_list[i].render(w,dl)
-		scores[i]=get_score(b,ti_list[i],w,dl)
-		trees.append(b)
+		w=w_list[i]
+		dl=dl_list[i]
+		b=trees[i]
+		#scores[i]=get_score(b,ti_list[i],w,dl)
+		scores[i]=get_morph_score(b,ti_list[i],w,dl)
 	sorted_idx=np.argsort(scores)
 	selected_ls=[]
 	selected_ti=[]
@@ -484,7 +499,35 @@ def selection(ls_list,ti_list,n_sel=1,depth_specific=False):
 		selected_ti.append(ti_list[sorted_idx[-1-j]])
 	return selected_ls, selected_ti,scores[sorted_idx[-1]],trees[sorted_idx[-1]]
 
+
+
+
+# def selection(ls_list,ti_list,n_sel=1,depth_specific=False):
+# 	l=len(ls_list)
+# 	scores=np.zeros(l)
+# 	trees=[]
+# 	for i in range(l):
+# 		w,dl=ls_list[i].evolution('X',ti_list[i].depth,depth_specific=depth_specific)
+# 		b=ti_list[i].render(w,dl)
+# 		scores[i]=get_score(b,ti_list[i],w,dl)
+# 		trees.append(b)
+# 	sorted_idx=np.argsort(scores)
+# 	selected_ls=[]
+# 	selected_ti=[]
+# 	for j in range(n_sel):
+# 		selected_ls.append(ls_list[sorted_idx[-1-j]])
+# 		selected_ti.append(ti_list[sorted_idx[-1-j]])
+# 	return selected_ls, selected_ti,scores[sorted_idx[-1]],trees[sorted_idx[-1]]
+
 def mutation(selected_ls,selected_ti,n_mut=10,letter=['X'],leaf_specific=False,max_character=15,max_depth=4):
+	#generates the next generation of mutates from the survivors:
+	#takes a list of l-systems selected_ls and the corresponding list of tree intrepreter selected_ti
+	#and the number of deduced mutants (f)or the next generation) n_mut.
+	#For the mode leaf_specific we need to take care of the case where the depth mutates. We
+	#then need to move the leaf specific rule to its new depth.
+
+	if len(selected_ls)!= len(selected_ti):
+		raise ValueError('the number of selected l-systems is not equal the number of selected tree interpreter')
 	L=len(selected_ti)
 	mut_ls=[]
 	mut_ti=[]

@@ -2,6 +2,7 @@ import sys
 from copy import deepcopy
 import random
 
+
 import numpy as np
 from PIL import Image,ExifTags,ImageFilter,ImageOps, ImageDraw
 import PIL
@@ -72,6 +73,8 @@ class L_system():
 				self.rule[v]=var
 
 	def sample_word(self,extension={},immune={},length=1):
+		#samples a word from the vocabulary plus possible extension symbols.
+		#the symbols in the immune will not be sampled from
 		extended_set=self.vocabulary.union(extension)
 		extended_set.difference(immune)
 		sampled_word=''
@@ -169,9 +172,7 @@ class L_system():
 		#w is a word (also called axiom in this context) over the vocabulary set (if it has symbols outside of the vocabulary set, the identity map is assumed)
 		#n_iter, the amount of iterations
 		#print('calculate DNA...')
-		depth_list=[]
-		for i in range(len(w)):
-			depth_list.append(0)#the root has same depth than the first iteration
+		depth_list=[0]*len(w)
 		for n in range(n_iter):
 			if depth_specific:
 				w,depth_list=self.iter_step(w,depth_list,depth=n,depth_specific=True)
@@ -288,7 +289,6 @@ class Depth_specific_tree_interpreter():
 				del self.m_angles[-1]
 				del self.lengths[-1]
 				del self.cs[-1]
-
 
 	def render(self,w,depth_list,starting_root=np.array([0,0]),starting_angle=np.pi/2,side_force=None):
 		#w must be a word over the standard alphabet
